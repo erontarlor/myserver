@@ -2,42 +2,29 @@
 
 #sshd_config=/etc/ssh/sshd_config
 sshd_config=sshd_config
+declare -i step
+step=1
 
 
 call()
 {
-  if [ ! -z "$1" ]
-  then
-    echo $1
-  fi
-  if [ ! -z "$2" ]
-  then
-    $2
-  fi
+  $2
   if [ $? -gt 0 ]
   then
     exit $?
   fi
-  echo ""
 }
 
 
-addUser()
+runStep()
 {
-  local name
-  while read -r -p "Enter username: " name
-  do
-    if [ ! -z $name ]
-    then
-      break
-    fi
-  done
-  call "" #adduser $name
-  if [ $1 = 1 ]
+  echo "$step. $1"
+  if [ ! -z "$2" ]
   then
-    echo "Making user a sudo user..."
-    call "" #usermod -aG sudo $name
+    $2
   fi
+  echo ""
+  step+=1
 }
 
 
@@ -74,22 +61,28 @@ askInteger()
 }
 
 
-changeRootPassword()
+addUser()
 {
-  call "1. Changing root password..." #"passwd"
-}
-
-
-addMainUser()
-{
-  echo "2. Adding main user..."
-  addUser 1
+  local name
+  while read -r -p "Enter username: " name
+  do
+    if [ ! -z $name ]
+    then
+      break
+    fi
+  done
+#  call "adduser $name"
+  if [ $1 = 1 ]
+  then
+    echo "Making user a sudo user..."
+#    call "usermod -aG sudo $name"
+  fi
 }
 
 
 addAdditionalUser()
 {
-  while askYesOrNo "3. Do you want to add another user"
+  while askYesOrNo "Do you want to add another user"
   do
     if askYesOrNo "Do you want the user to be a sudo user"
     then
@@ -98,101 +91,43 @@ addAdditionalUser()
       addUser 0
     fi
   done
-  echo ""
-}
-
-
-updatePackageDatabase()
-{
-  call "4. Updating installation package database..." #"apt-get update"
-}
-
-
-installVim()
-{
-  call "5. Installing vim-gtk..." #"apt-get install vim-gtk -y"
-}
-
-
-installDockerPrerequisites()
-{
-  call "6. Installing docker prerequisites..." #"apt-get install apt-transport-https ca-certificates curl software-properties-common -y"
-}
-
-
-addingDockerRepositoryKey()
-{
-  call "7. Adding docker repository key..." #"curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -"
-}
-
-
-addingDockerRepository()
-{
-  call "8. Adding docker repository..." #"add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable\""
-}
-
-
-updatePackageDatabaseDocker()
-{
-  call "9. Updating installation package database for docker..." #"apt-get update"
-}
-
-
-installDocker()
-{
-  call "10. Installing docker..." #"apt-get install docker-ce -y"
-}
-
-
-installOwncloud()
-{
-  call "11. Installing owncloud..." #"docker pull owncloud/server"
 }
 
 
 disableSshRootLogin()
 {
-  echo "97. Disabling SSH root login..."
   sed -e 's/^\( *PermitRootLogin .*\)$/#\1/' $sshd_config > $sshd_config.new && mv $sshd_config.new $sshd_config
   echo "PermitRootLogin no" >> $sshd_config
-  echo ""
 }
 
 
 changeSshPort()
 {
-  echo "98. Changing SSH port..."
   askInteger "Which port do you want to use for SSH"
   local port=$?
   sed -e 's/^\( *Port .*$\)/#\1/' $sshd_config > $sshd_config.new && mv $sshd_config.new $sshd_config
   echo "Port $port" >> $sshd_config
-  echo ""
 }
 
 
-restartSSh()
-{
-  call "99. Restarting SSH daemon..." #"systemctl restart ssh.service"
-}
+runStep "Changing root password..." #"call passwd"
+runStep "Adding main user..." "addUser 1"
+runStep "Adding additional users..." "addAdditionalUser"
+runStep "Updating installation package database..." #"call apt-get update"
+runStep "Installing vim-gtk..." #"call apt-get install vim-gtk -y"
+runStep "Installing docker prerequisites..." #"call apt-get install apt-transport-https ca-certificates curl software-properties-common -y"
+runStep "Adding docker repository key..." #"call curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -"
+runStep "Adding docker repository..." #"call add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable\""
+runStep "Updating installation package database for docker..." #"call apt-get update"
+runStep "Installing docker..." #"call apt-get install docker-ce -y"
+runStep "Installing docker image for redis..." #"call docker pull webhippie/redis"
+runStep "Installing docker image for mariadb..." #"call docker pull webhippie/mariadb"
+runStep "Installing docker image for owncloud..." #"call docker pull owncloud/server"
 
 
-changeRootPassword
-addMainUser
-addAdditionalUser
-updatePackageDatabase
-installVim
-installDockerPrerequisites
-addingDockerRepositoryKey
-addingDockerRepository
-updatePackageDatabaseDocker
-installDocker
-installOwncloud
-
-
-
-disableSshRootLogin
-changeSshPort
-restartSSh
+runStep "Disabling SSH root login..." "disableSshRootLogin"
+runStep "Changing SSH port..." "changeSshPort"
+runStep "Restarting SSH daemon..." #"call systemctl restart ssh.service"
 
 echo "Done."
 exit 0
