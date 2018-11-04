@@ -437,6 +437,15 @@ createSslConf()
 }
 
 
+declare passwordSha1
+calculatePasswordSha1()
+{
+  declare array
+  call "array=(\$( echo -n \"$1\" | sha1sum ))"
+  passwordSha1=${array[0]}
+}
+
+
 installOwnCloud()
 {
   askPassword "Enter OwnCloud admin password" $ownCloudPassword
@@ -446,10 +455,12 @@ installOwnCloud()
   call "chmod 600 $file"
   call "echo \"OWNCLOUD_DOMAIN=localhost\" >> $file"
   call "echo \"ADMIN_USERNAME=admin\" >> $file"
-  call "echo \"ADMIN_PASSWORD='$ownCloudPassword'\" >> $file"
+  call "echo \"ADMIN_PASSWORD=$ownCloudPassword\" >> $file"
   call "echo \"HTTP_PORT=443\" >> $file"
   call "wget -O docker-compose.yml https://raw.githubusercontent.com/owncloud-docker/server/master/docker-compose.yml"
   call "docker-compose up -d"
+  calculatePasswordSha1 "$ownCloudPassword"
+  call "docker-compose exec owncloud mysql -h db -powncloud -P 3306 -u owncloud -D owncloud -e \"update oc_users set password='$passwordSha1' where uid='admin';\""
   call "docker cp /etc/ssl/certs/${certificateDomain[0]}.pem "'$(docker ps -q -f name=owncloud)'":/etc/ssl/certs"
   call "docker cp /etc/ssl/private/${certificateDomain[0]}.key "'$(docker ps -q -f name=owncloud)'":/etc/ssl/private"
   call "docker-compose exec owncloud chown root:root /etc/ssl/certs/${certificateDomain[0]}.pem"
