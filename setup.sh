@@ -450,6 +450,11 @@ installOwnCloud()
 {
   askPassword "Enter OwnCloud admin password" $ownCloudPassword
   ownCloudPassword=$password
+  if [ ! -d owncloud ]
+  then
+    call "mkdir owncloud"
+  fi
+  call "cd owncloud"
   declare file=".env"
   call "echo \"OWNCLOUD_VERSION=10.0\" > $file"
   call "chmod 600 $file"
@@ -460,9 +465,10 @@ installOwnCloud()
   call "wget -O docker-compose.yml https://raw.githubusercontent.com/owncloud-docker/server/master/docker-compose.yml"
   call "docker-compose up -d"
   calculatePasswordSha1 "$ownCloudPassword"
+  sleep 10
   call "docker-compose exec owncloud mysql -h db -powncloud -P 3306 -u owncloud -D owncloud -e \"update oc_users set password='$passwordSha1' where uid='admin';\""
-  call "docker cp /etc/ssl/certs/${certificateDomain[0]}.pem "'$(docker ps -q -f name=owncloud)'":/etc/ssl/certs"
-  call "docker cp /etc/ssl/private/${certificateDomain[0]}.key "'$(docker ps -q -f name=owncloud)'":/etc/ssl/private"
+  call "docker cp /etc/ssl/certs/${certificateDomain[0]}.pem "'$(docker ps -q -f name=owncloud_1)'":/etc/ssl/certs"
+  call "docker cp /etc/ssl/private/${certificateDomain[0]}.key "'$(docker ps -q -f name=owncloud_1)'":/etc/ssl/private"
   call "docker-compose exec owncloud chown root:root /etc/ssl/certs/${certificateDomain[0]}.pem"
   call "docker-compose exec owncloud chmod 644 /etc/ssl/certs/${certificateDomain[0]}.pem"
   call "docker-compose exec owncloud chown root:ssl-cert /etc/ssl/private/${certificateDomain[0]}.key"
@@ -471,11 +477,12 @@ installOwnCloud()
   call "docker-compose exec owncloud ln -s /etc/apache2/mods-available/ssl.conf /etc/apache2/mods-enabled"
   call "docker-compose exec owncloud ln -s /etc/apache2/mods-available/ssl.load /etc/apache2/mods-enabled"
   createSslConf
-  call 'docker cp ssl.conf $(docker ps -q -f name=owncloud):/etc/apache2/conf-enabled'
+  call 'docker cp ssl.conf $(docker ps -q -f name=owncloud_1):/etc/apache2/conf-enabled'
   call "docker-compose exec owncloud chown root:root /etc/apache2/conf-enabled/ssl.conf"
   call "docker-compose exec owncloud chmod 644 /etc/apache2/conf-enabled/ssl.conf"
   call "docker-compose restart owncloud"
   call "rm ssl.conf"
+  call "cd .."
 }
 
 
