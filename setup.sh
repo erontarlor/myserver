@@ -173,6 +173,13 @@ changeRootPassword()
 }
 
 
+userExists()
+{
+  id -u $1 >/dev/null 2>&1
+  return $?
+}
+
+
 addUser()
 {
   askValue "Enter user name" "${userName[$1]}"
@@ -181,7 +188,14 @@ addUser()
   userFullName[$1]=$value
   askPassword "Enter password" "${userPassword[$1]}"
   userPassword[$1]=$password
-  call "useradd -m -d /home/${userName[$1]} -c \"${userFullName[$1]},,,\" -s /bin/bash ${userName[$1]}"
+  if userExists ${userName[$1]}
+  then
+    echo "User ${userName[$1]} already exists"
+  else
+    echo "Adding user ${userName[$1]}"
+    call "useradd -m -d /home/${userName[$1]} -c \"${userFullName[$1]},,,\" -s /bin/bash ${userName[$1]}"
+  fi
+  echo "Changing password..."
   call "echo \"${userName[$1]}:${userPassword[$1]}\" | chpasswd"
   if [ "$1" = 0 ] || askYesOrNo "Do you want the user to be a sudo user" ${userSudo[$1]}
   then
@@ -216,16 +230,17 @@ addAdditionalUser()
 
 createSslCertificate()
 {
-  askValue "Enter domain name" ${certificateDomain[$1]}
+  askValue "Enter domain name" "${certificateDomain[$1]}"
   certificateDomain[$1]=$value
-  askValue "Enter country abbreviation" ${certificateCountry[$1]}
+  askValue "Enter country abbreviation" "${certificateCountry[$1]}"
   certificateCountry[$1]=$value
-  askValue "Enter state" ${certificateState[$1]}
+  askValue "Enter state" "${certificateState[$1]}"
   certificateState[$1]=$value
-  askValue "Enter city" ${certificateCity[$1]}
+  askValue "Enter city" "${certificateCity[$1]}"
   certificateCity[$1]=$value
-  askValue "Enter organization" ${certificateOrganization[$1]}
+  askValue "Enter organization" "${certificateOrganization[$1]}"
   certificateOrganization[$1]=$value
+  echo "Creating SSL certificate for domain ${certificateDomain[$1]}..."
   call "openssl genrsa -out ${certificateDomain[$1]}.key 1024"
   call "openssl req -new -subj \"/C=${certificateCountry[$1]}/ST=${certificateState[$1]}/L=${certificateCity[$1]}/O=${certificateOrganization[$1]}/OU=none/CN=${certificateDomain[$1]}\" -key ${certificateDomain[$1]}.key -out ${certificateDomain[$1]}.pem"
   call "cp ${certificateDomain[$1]}.key ${certificateDomain[$1]}.key.org"
@@ -428,9 +443,10 @@ installOwnCloud()
   ownCloudPassword=$password
   declare file=".env"
   call "echo \"OWNCLOUD_VERSION=10.0\" > $file"
+  call "chmod 600 $file"
   call "echo \"OWNCLOUD_DOMAIN=localhost\" >> $file"
   call "echo \"ADMIN_USERNAME=admin\" >> $file"
-  call "echo \"ADMIN_PASSWORD=$ownCloudPassword\" >> $file"
+  call "echo \"ADMIN_PASSWORD='$ownCloudPassword'\" >> $file"
   call "echo \"HTTP_PORT=443\" >> $file"
   call "wget -O docker-compose.yml https://raw.githubusercontent.com/owncloud-docker/server/master/docker-compose.yml"
   call "docker-compose up -d"
@@ -463,6 +479,7 @@ changeSshPort()
 {
   askInteger "Which port do you want to use for SSH" $sshdPort
   sshdPort=$integer
+  echo "Changing SSL port to $sshdPort..."
   call "sed -e 's/^\( *Port .*$\)/#\1/' $sshdConfig > $sshdConfig.new && mv $sshdConfig.new $sshdConfig"
   call "echo \"Port $sshdPort\" >> $sshdConfig"
 }
