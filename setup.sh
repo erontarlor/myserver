@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 declare -i step=1
 declare -i debug=0
@@ -31,8 +31,7 @@ then
   source $configFile
 fi
 
-#declare sshdConfig=/etc/ssh/sshd_config
-declare sshdConfig=sshd_config
+declare sshdConfig=/etc/ssh/sshd_config
 
 
 getArgs()
@@ -80,15 +79,15 @@ runStep()
 
 askYesOrNo()
 {
-  local default
+  declare default
   if [ "$2" = 1 ]
   then
     default="Y/n"
   else
     default="y/N"
   fi
-  local answer
-  while read -r -p "$1 [$default]? " answer
+  declare answer
+  while [ "$auto" = 1 ] || read -r -p "$1 [$default]? " answer
   do
     if [ -z "$answer" ]
     then
@@ -113,25 +112,25 @@ askYesOrNo()
 }
 
 
+declare integer
 askInteger()
 {
-  local answer
-  while read -r -p "$1 [$2]? " answer
+  while [ "$auto" = 1 ] || read -r -p "$1 [$2]? " integer
   do
-    answer="${answer:-$2}"
-    if [[ "$answer" =~ ^[0-9][0-9]*$ ]] && [ "$answer" -gt 0 ] && [ "$answer" -lt 65535 ]
+    integer="${integer:-$2}"
+    if [[ "$integer" =~ ^[0-9][0-9]*$ ]] && [ "$integer" -gt 0 ] && [ "$integer" -lt 65535 ]
     then
       break
     fi
   done
-  return $answer
+  return $integer
 }
 
 
 declare value
 askValue()
 {
-  while read -r -p "$1 [$2]: " value
+  while [ "$auto" = 1 ] || read -r -p "$1 [$2]: " value
   do
     value="${value:-$2}"
     if [ ! -z "$value" ]
@@ -145,12 +144,12 @@ askValue()
 declare password
 askPassword()
 {
-  local default
+  declare default
   if [ ! -z "$2" ]
   then
     default="********"
   fi
-  while read -r -p "$1 [$default]: " password
+  while [ "$auto" = 1 ] || read -s -r -p "$1 [$default]: " password
   do
     password="${password:-$2}"
     if [ ! -z "$password" ]
@@ -163,19 +162,19 @@ askPassword()
 
 changeRootPassword()
 {
-  askPassword "Enter root password" $rootPassword
+  askPassword "Enter root password" "$rootPassword"
   rootPassword=$password
-  call "echo \"julian:$rootPassword\" | chpasswd"
+  call "echo \"root:$rootPassword\" | chpasswd"
 }
 
 
 addUser()
 {
-  askValue "Enter user name" ${userName[$1]}
+  askValue "Enter user name" "${userName[$1]}"
   userName[$1]=$value
-  askValue "Enter user's full name" ${userFullName[$1]}
+  askValue "Enter user's full name" "${userFullName[$1]}"
   userFullName[$1]=$value
-  askPassword "Enter password" ${userPassword[$1]}
+  askPassword "Enter password" "${userPassword[$1]}"
   userPassword[$1]=$password
   call "useradd -m -d /home/${userName[$1]} -c \"${userFullName[$1]},,,\" -s /bin/bash ${userName[$1]}"
   call "echo \"${userName[$1]}:${userPassword[$1]}\" | chpasswd"
@@ -192,11 +191,21 @@ addUser()
 
 addAdditionalUser()
 {
-  while askYesOrNo "Do you want to add another user"
-  do
-    addUser $userCount
-    let userCount=userCount+1
-  done
+  if [ "$auto" = 1 ]
+  then
+    declare count=$userCount
+    while [ "$count" -gt 1 ]
+    do
+      let count=count-1
+      addUser $count
+    done
+  else
+    while askYesOrNo "Do you want to add another user"
+    do
+      addUser $userCount
+      let userCount=userCount+1
+    done
+  fi
 }
 
 
@@ -213,7 +222,7 @@ createSslCertificate()
   askValue "Enter organization" ${certificateOrganization[$1]}
   certificateOrganization[$1]=$value
   call "openssl genrsa -out ${certificateDomain[$1]}.key 1024"
-  call "openssl req -new -subj "/C=${certificateCountry[$1]}/ST=${certificateState[$1]}/L=${certificateCity[$1]}/O=${certificateOrganization[$1]}/OU=none/CN=${certificateDomain[$1]}" -key ${certificateDomain[$1]}.key -out ${certificateDomain[$1]}.pem"
+  call "openssl req -new -subj \"/C=${certificateCountry[$1]}/ST=${certificateState[$1]}/L=${certificateCity[$1]}/O=${certificateOrganization[$1]}/OU=none/CN=${certificateDomain[$1]}\" -key ${certificateDomain[$1]}.key -out ${certificateDomain[$1]}.pem"
   call "cp ${certificateDomain[$1]}.key ${certificateDomain[$1]}.key.org"
   call "cp ${certificateDomain[$1]}.pem ${certificateDomain[$1]}.pem.org"
   call "openssl rsa -in ${certificateDomain[$1]}.key.org -out ${certificateDomain[$1]}.key"
@@ -230,11 +239,21 @@ createSslCertificate()
 
 createAdditionalSslCertificate()
 {
-  while askYesOrNo "Do you want to create another SSL certificate"
-  do
-    createSslCertificate $certificateCount
-    let certificateCount=certificateCount+1
-  done
+  if [ "$auto" = 1 ]
+  then
+    declare count=$certificateCount
+    while [ "$count" -gt 1 ]
+    do
+      let count=count-1
+      createSslCertificate $count
+    done
+  else
+    while askYesOrNo "Do you want to create another SSL certificate"
+    do
+      createSslCertificate $certificateCount
+      let certificateCount=certificateCount+1
+    done
+  fi
 }
 
 
@@ -252,7 +271,7 @@ installDocker()
 
 createSslConf()
 {
-  local file=ssl.conf
+  declare file=ssl.conf
 
   call "echo '<VirtualHost *:\${APACHE_LISTEN}>' > $file"
   call "echo 'ServerAdmin \${APACHE_SERVER_ADMIN}' >> $file"
@@ -402,7 +421,7 @@ installOwnCloud()
 {
   askPassword "Enter OwnCloud admin password" $ownCloudPassword
   ownCloudPassword=$password
-  local file=".env"
+  declare file=".env"
   call "echo \"OWNCLOUD_VERSION=10.0\" > $file"
   call "echo \"OWNCLOUD_DOMAIN=localhost\" >> $file"
   call "echo \"ADMIN_USERNAME=admin\" >> $file"
@@ -439,7 +458,7 @@ disableSshRootLogin()
 changeSshPort()
 {
   askInteger "Which port do you want to use for SSH" $sshdPort
-  sshdPort=$?
+  sshdPort=$integer
   call "sed -e 's/^\( *Port .*$\)/#\1/' $sshdConfig > $sshdConfig.new && mv $sshdConfig.new $sshdConfig"
   call "echo \"Port $sshdPort\" >> $sshdConfig"
 }
@@ -447,31 +466,31 @@ changeSshPort()
 
 saveSettings()
 {
-  local file=setup.cfg
-  local newFile=$file.new
-  call "echo \"rootPassword=$rootPassword\" > $newFile"
+  declare file=setup.cfg
+  declare newFile=$file.new
+  call "echo \"rootPassword='$rootPassword'\" > $newFile"
   call "chmod 600 $newFile"
   call "echo \"userCount=$userCount\" >> $newFile"
-  local count=$userCount
+  declare count=$userCount
   while [ "$count" -gt 0 ]
   do
     let count=count-1
-    call "echo \"userName[$count]=${userName[$count]}\" >> $newFile"
-    call "echo \"userFullName[$count]=${userFullName[$count]}\" >> $newFile"
-    call "echo \"userSudo[$count]=${userSudo[$count]}\" >> $newFile"
-    call "echo \"userPassword[$count]=${userPassword[$count]}\" >> $newFile"
+    call "echo \"userName[$count]='${userName[$count]}'\" >> $newFile"
+    call "echo \"userFullName[$count]='${userFullName[$count]}'\" >> $newFile"
+    call "echo \"userSudo[$count]='${userSudo[$count]}'\" >> $newFile"
+    call "echo \"userPassword[$count]='${userPassword[$count]}'\" >> $newFile"
   done
-  call "echo \"ownCloudPassword=$ownCloudPassword\" >> $newFile"
+  call "echo \"ownCloudPassword='$ownCloudPassword'\" >> $newFile"
   call "echo \"certificateCount=$certificateCount\" >> $newFile"
-  local count=$certificateCount
+  declare count=$certificateCount
   while [ "$count" -gt 0 ]
   do
     let count=count-1
-    call "echo \"certificateDomain[$count]=${certificateDomain[$count]}\" >> $newFile"
-    call "echo \"certificateCountry[$count]=${certificateCountry[$count]}\" >> $newFile"
-    call "echo \"certificateState[$count]=${certificateState[$count]}\" >> $newFile"
-    call "echo \"certificateCity[$count]=${certificateCity[$count]}\" >> $newFile"
-    call "echo \"certificateOrganization[$count]=${certificateOrganization[$count]}\" >> $newFile"
+    call "echo \"certificateDomain[$count]='${certificateDomain[$count]}'\" >> $newFile"
+    call "echo \"certificateCountry[$count]='${certificateCountry[$count]}'\" >> $newFile"
+    call "echo \"certificateState[$count]='${certificateState[$count]}'\" >> $newFile"
+    call "echo \"certificateCity[$count]='${certificateCity[$count]}'\" >> $newFile"
+    call "echo \"certificateOrganization[$count]='${certificateOrganization[$count]}'\" >> $newFile"
   done
   call "echo \"sshdPort=$sshdPort\" >> $newFile"
   if [ -f "$file" ]
@@ -480,6 +499,7 @@ saveSettings()
   fi
   call "mv $newFile $file"
 }
+
 
 getArgs "$@"
 if [ "$debug" = 1 ]
