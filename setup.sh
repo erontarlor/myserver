@@ -428,8 +428,6 @@ installOwnCloud()
   call "echo \"ADMIN_PASSWORD=$ownCloudPassword\" >> $file"
   call "echo \"HTTP_PORT=443\" >> $file"
   call "wget -O docker-compose.yml https://raw.githubusercontent.com/owncloud-docker/server/master/docker-compose.yml"
-#  call "docker run -d --name owncloud --link mariadb:db --link redis:redis -p 80:8080 -e OWNCLOUD_DOMAIN=localhost -e OWNCLOUD_DB_TYPE=mysql -e OWNCLOUD_DB_NAME=owncloud -e OWNCLOUD_DB_USERNAME=owncloud -e OWNCLOUD_DB_PASSWORD=owncloud -e OWNCLOUD_DB_HOST=db -e OWNCLOUD_ADMIN_USERNAME=admin -e OWNCLOUD_ADMIN_PASSWORD=$password -e OWNCLOUD_REDIS_ENABLED=true -e OWNCLOUD_REDIS_HOST=redis --volume owncloud_files:/mnt/data owncloud/server:10.0"
-#  call "docker run --name owncloud -p 80:80 -p 443:443 -d l3iggs/owncloud"
   call "docker-compose up -d"
   call "docker cp /etc/ssl/certs/${certificateDomain[0]}.pem "'$(docker ps -q -f name=owncloud)'":/etc/ssl/certs"
   call "docker cp /etc/ssl/private/${certificateDomain[0]}.key "'$(docker ps -q -f name=owncloud)'":/etc/ssl/private"
@@ -445,6 +443,7 @@ installOwnCloud()
   call "docker-compose exec owncloud chown root:root /etc/apache2/conf-enabled/ssl.conf"
   call "docker-compose exec owncloud chmod 644 /etc/apache2/conf-enabled/ssl.conf"
   call "docker-compose restart owncloud"
+  call "rm ssl.conf"
 }
 
 
@@ -523,16 +522,6 @@ runStep "Creating additional SSL certificates..." createAdditionalSslCertificate
 runStep "Updating installation package database..." call "apt-get update"
 runStep "Installing vim-gtk..." call "apt-get install vim-gtk -y"
 runStep "Installing docker..." installDocker
-#runStep "Installing docker image for redis..." call "docker pull webhippie/redis"
-#runStep "Installing docker image for mariadb..." call "docker pull webhippie/mariadb"
-#runStep "Installing docker image for owncloud..." call "docker pull owncloud/server:10.0"
-#runStep "Installing docker image for owncloud..." call "docker pull l3iggs/owncloud"
-#runStep "Creating docker volume owncloud_redis..." call "docker volume create owncloud_redis"
-#runStep "Creating docker volume owncloud_mysql..." call "docker volume create owncloud_mysql"
-#runStep "Creating docker volume owncloud_backup..." call "docker volume create owncloud_backup"
-#runStep "Creating docker volume owncloud_files..." call "docker volume create owncloud_files"
-#runStep "Starting docker container redis..." call "docker run -d --name redis -e REDIS_DATABASES=1 --volume owncloud_redis:/var/lib/redis webhippie/redis:latest"
-#runStep "Starting docker container mariadb..." call "docker run -d --name mariadb -e MARIADB_ROOT_PASSWORD=owncloud -e MARIADB_USERNAME=owncloud -e MARIADB_PASSWORD=owncloud -e MARIADB_DATABASE=owncloud --volume owncloud_mysql:/var/lib/mysql --volume owncloud_backup:/var/lib/backup webhippie/mariadb:latest"
 runStep "Installing docker container owncloud..." installOwnCloud
 runStep "Disabling SSH root login..." disableSshRootLogin
 runStep "Changing SSH port..." changeSshPort
