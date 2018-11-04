@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 declare -i step=1
 declare -i debug=0
@@ -80,13 +80,15 @@ runStep()
 askYesOrNo()
 {
   declare default
+  declare answer
   if [ "$2" = 1 ]
   then
     default="Y/n"
+    answer="y"
   else
     default="y/N"
+    answer="n"
   fi
-  declare answer
   while [ "$auto" = 1 ] || read -r -p "$1 [$default]? " answer
   do
     if [ -z "$answer" ]
@@ -115,6 +117,7 @@ askYesOrNo()
 declare integer
 askInteger()
 {
+  integer=$2
   while [ "$auto" = 1 ] || read -r -p "$1 [$2]? " integer
   do
     integer="${integer:-$2}"
@@ -130,6 +133,7 @@ askInteger()
 declare value
 askValue()
 {
+  value=$2
   while [ "$auto" = 1 ] || read -r -p "$1 [$2]: " value
   do
     value="${value:-$2}"
@@ -149,6 +153,7 @@ askPassword()
   then
     default="********"
   fi
+  password=$2
   while [ "$auto" = 1 ] || read -s -r -p "$1 [$default]: " password
   do
     password="${password:-$2}"
