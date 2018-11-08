@@ -32,7 +32,7 @@ then
 fi
 
 declare sshdConfig=/etc/ssh/sshd_config
-
+#declare ownCloudHtaccess=/var/www/owncloud/.htaccess
 
 getArgs()
 {
@@ -446,6 +446,17 @@ calculatePasswordSha1()
 }
 
 
+createOwnCloudConf()
+{
+  declare file=owncloud.conf
+
+  call "echo \"Alias /owncloud /var/www/owncloud\" > $file"
+  call "echo \"<Directory /var/www/owncloud/>\" >> $file"
+  call "echo \"  AllowOverride All\" >> $file"
+  call "echo \"</Directory>\" >> $file"
+}
+
+
 installOwnCloud()
 {
   askPassword "Enter OwnCloud admin password" $ownCloudPassword
@@ -463,10 +474,16 @@ installOwnCloud()
   call "echo \"ADMIN_PASSWORD=$ownCloudPassword\" >> $file"
   call "echo \"HTTP_PORT=8080\" >> $file"
   call "wget -O docker-compose.yml https://raw.githubusercontent.com/owncloud-docker/server/master/docker-compose.yml"
+  call "sed -e 's/\(- OWNCLOUD_DOMAIN=.*\)$/\1\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_HOST=${certificateDomain[0]}\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_PROTOCOL=https\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_WEBROOT=\/\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_CLI_URL=https:\/\/${certificateDomain[0]}\n\ \ \ \ \ \ - OWNCLOUD_HTACCESS_REWRITE_BASE=\//' -i docker-compose.yml"
   call "docker-compose up -d"
-  calculatePasswordSha1 "$ownCloudPassword"
   sleep 10
+  calculatePasswordSha1 "$ownCloudPassword"
   call "docker-compose exec owncloud mysql -h db -powncloud -P 3306 -u owncloud -D owncloud -e \"update oc_users set password='$passwordSha1' where uid='admin';\""
+#  createOwnCloudConf
+#  call 'docker cp owncloud.conf $(docker ps -q -f name=owncloud_1):/etc/apache2/conf-enabled'
+#  call "rm owncloud.conf"
+#  call "docker-compose exec owncloud sed -e 's/\(RewriteBase \).*/\1\/owncloud\//' -i $ownCloudHtaccess"
+
 #  call "docker cp /etc/ssl/certs/${certificateDomain[0]}.pem "'$(docker ps -q -f name=owncloud_1)'":/etc/ssl/certs"
 #  call "docker cp /etc/ssl/private/${certificateDomain[0]}.key "'$(docker ps -q -f name=owncloud_1)'":/etc/ssl/private"
 #  call "docker-compose exec owncloud chown root:root /etc/ssl/certs/${certificateDomain[0]}.pem"
@@ -478,10 +495,11 @@ installOwnCloud()
 #  call "docker-compose exec owncloud ln -s /etc/apache2/mods-available/ssl.load /etc/apache2/mods-enabled"
 #  createSslConf
 #  call 'docker cp ssl.conf $(docker ps -q -f name=owncloud_1):/etc/apache2/conf-enabled'
+#  call "rm ssl.conf"
 #  call "docker-compose exec owncloud chown root:root /etc/apache2/conf-enabled/ssl.conf"
 #  call "docker-compose exec owncloud chmod 644 /etc/apache2/conf-enabled/ssl.conf"
 #  call "docker-compose restart owncloud"
-#  call "rm ssl.conf"
+
   call "cd .."
 }
 
@@ -505,14 +523,15 @@ createSite()
   call "echo \"ServerAlias www.$1\" >> $file"
   call "echo \"ServerAdmin webmaster@localhost\" >> $file"
 
-  call "echo \"SSLEngine on\" >> $file"
-  call "echo \"SSLProxyEngine On\" >> $file"
-  call "echo \"ProxyPreserveHost On\" >> $file"
-  call "echo \"ProxyRequests Off\" >> $file"
-  call "echo \"ProxyPass /$2 http://localhost:8080\" >> $file"
+  #call "echo \"SSLEngine on\" >> $file"
+  #call "echo \"SSLProxyEngine On\" >> $file"
+  #call "echo \"ProxyPreserveHost On\" >> $file"
+  #call "echo \"ProxyRequests Off\" >> $file"
+  call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
+  call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
 
-  call "echo \"ErrorLog \${APACHE_LOG_DIR}/error.log\" >> $file"
-  call "echo \"CustomLog \${APACHE_LOG_DIR}/ssl_access.log combined\" >> $file"
+  call "echo 'ErrorLog \${APACHE_LOG_DIR}/error.log' >> $file"
+  call "echo 'CustomLog \${APACHE_LOG_DIR}/ssl_access.log combined' >> $file"
 
   # Possible values include: debug, info, notice, warn, error, crit,
   # alert, emerg.
@@ -520,7 +539,7 @@ createSite()
 
   #   SSL Engine Switch:
   #   Enable/Disable SSL for this virtual host.
-  call "echo \"SSLEngine on\" >> $file"
+#  call "echo \"SSLEngine on\" >> $file"
 
   #   A self-signed (snakeoil) certificate can be created by installing
   #   the ssl-cert package. See
@@ -664,13 +683,18 @@ configureApache()
   then
     call "rm \"$originalSite\""
   fi
-  createLink "/etc/apache2/mods-available/proxy.conf" "/etc/apache2/mods-enabled/proxy.conf"
-  createLink "/etc/apache2/mods-available/proxy.load" "/etc/apache2/mods-enabled/proxy.load"
-  createLink "/etc/apache2/mods-available/proxy_http.load" "/etc/apache2/mods-enabled/proxy_http.load"
-  createLink "/etc/apache2/mods-available/socache_shmcb.load" "/etc/apache2/mods-enabled/socache_shmcb.load"
-  createLink "/etc/apache2/mods-available/ssl.conf" "/etc/apache2/mods-enabled/ssl.conf"
-  createLink "/etc/apache2/mods-available/ssl.load" "/etc/apache2/mods-enabled/ssl.load"
-  createSite "${certificateDomain[0]}" "owncloud"
+  call "a2enmod proxy"
+  call "a2enmod proxy_http"
+  call "a2enmod proxy_ajp"
+  call "a2enmod rewrite"
+  call "a2enmod deflate"
+  call "a2enmod headers"
+  call "a2enmod proxy_balancer"
+  call "a2enmod proxy_connect"
+  call "a2enmod proxy_html"
+  call "a2enmod socache_shmcb"
+  call "a2enmod ssl"
+  createSite "${certificateDomain[0]}"
   call "service apache2 restart"
 }
 
