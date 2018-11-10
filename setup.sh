@@ -1,4 +1,13 @@
 #!/bin/bash
+#
+# setup.sh V0.1
+#
+# Script for setting up a private web server with pre-configured OwnCloud
+# service and automatically renewing Let's Encrypt SSL certificates, based
+# on a basic Ubuntu 18.04 cloud server with root access, using docker images.
+#
+# (c) 2018 by erontarlor
+#
 
 declare -i step=1
 declare -i debug=0
@@ -347,7 +356,7 @@ createWebSite()
   declare file="/etc/apache2/sites-available/000-$serverName.conf"
   call "echo \"<VirtualHost *:80>\" > $file"
   call "echo \"ServerName $serverName\" >> $file"
-#  call "echo \"ServerAlias www.$serverName\" >> $file"
+  #call "echo \"ServerAlias www.$serverName\" >> $file"
   call "echo \"ServerAdmin ${certificateEMail[$1]}\" >> $file"
   call "echo \"DocumentRoot /var/www/html\" >> $file"
   call "echo 'ErrorLog \${APACHE_LOG_DIR}/error.log' >> $file"
@@ -356,7 +365,7 @@ createWebSite()
   call "echo \"<IfModule mod_ssl.c>\" >> $file"
   call "echo \"<VirtualHost *:443>\" >> $file"
   call "echo \"ServerName $serverName\" >> $file"
-#  call "echo \"ServerAlias www.$serverName\" >> $file"
+  #call "echo \"ServerAlias www.$serverName\" >> $file"
   call "echo \"ServerAdmin ${certificateEMail[$1]}\" >> $file"
   call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
   call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
