@@ -45,6 +45,7 @@ In default, the script tries to install and setup SSL access, using free Let's E
     ./setup.sh -testcertificates
 
 You can then replace the certificate files by your own ones later on. They can be found here:
+
     /etc/ssl/certs/yourdomain.pem
     /etc/ssl/private/yourdomain.key 
 
@@ -53,7 +54,7 @@ After setup has completed, the server should be accessable from the internet via
 
     https://yourdomain
 
-And vi ssh using the new port you have specified:
+And via `ssh` using the new port you have specified:
 
     ssh -p yourport -l root yourdomain
 
