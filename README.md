@@ -65,10 +65,10 @@ The server should contain the following features:
 - Installed OwnCloud docker container with many pre-installed apps, the same users as for the OS and an *admin* user with the specified admin password
 - Installed supporting docker containers (mysql, redis)
 - Created docker volumes for permanently storing data (accessable from outside the containers):
-    - `owncloud_files`
-    - `owncloud_mysql`
-    - `owncloud_backup`
-    - `owncloud_redis`
+    - `owncloud_backup`: `/var/lib/docker/volumes/owncloud_backup/_data`
+    - `owncloud_files`: `/var/lib/docker/volumes/owncloud_files/_data`
+    - `owncloud_mysql`: `/var/lib/docker/volumes/owncloud_mysql/_data`
+    - `owncloud_redis`: `/var/lib/docker/volumes/owncloud_redis/_data`
 - Installed Let's Encrypt environment with cron job for automatically renewing the certificates
 - Configured Apache web server as proxy for redirecting the incoming https requests to the different docker containers
 - Disabled root login for SSH
