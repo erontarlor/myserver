@@ -372,7 +372,6 @@ createWebSite()
   # Possible values include: debug, info, notice, warn, error, crit,
   # alert, emerg.
   call "echo \"LogLevel warn\" >> $file"
-  call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubdomains;\\\"\" >> $file"
   if [ "$testcertificates" = 1 ]
   then
     #   SSL Engine Switch:
@@ -495,10 +494,10 @@ createWebSite()
     call "echo \"downgrade-1.0 force-response-1.0\" >> $file"
     # MSIE 7 and newer should be able to use keepalive\" >> $file"
     call "echo \"BrowserMatch \\\"MSIE [17-9]\\\" ssl-unclean-shutdown\" >> $file"
-    call "echo \"<IfModule mod_headers.c>\" >> $file"
-    call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubDomains; preload\\\"\" >> $file"
-    call "echo \"</IfModule>\" >> $file"
   fi
+  call "echo \"<IfModule mod_headers.c>\" >> $file"
+  call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubDomains; preload\\\"\" >> $file"
+  call "echo \"</IfModule>\" >> $file"
   call "echo \"</VirtualHost>\" >> $file"
   call "echo \"</IfModule>\" >> $file"
   createLink "$file" "/etc/apache2/sites-enabled/000-$serverName.conf"
