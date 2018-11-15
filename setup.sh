@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# setup.sh V0.1
+# setup.sh V0.2
 #
 # Script for setting up a private web server with pre-configured OwnCloud
 # service and automatically renewing Let's Encrypt SSL certificates, based
@@ -352,8 +352,9 @@ createWebSite()
   certificateOrganization[$1]=$value
   askValue "Enter e-mail" "${certificateEMail[$1]}"
   certificateEMail[$1]=$value
+  declare id=$(printf '%3.3d' $1)
   declare serverName=${certificateDomain[$1]}
-  declare file="/etc/apache2/sites-available/000-$serverName.conf"
+  declare file="/etc/apache2/sites-available/$id-$serverName.conf"
   call "echo \"<IfModule mod_ssl.c>\" > $file"
   if [ "$testcertificates" = 1 ]
   then
@@ -500,7 +501,7 @@ createWebSite()
   call "echo \"</IfModule>\" >> $file"
   call "echo \"</VirtualHost>\" >> $file"
   call "echo \"</IfModule>\" >> $file"
-  createLink "$file" "/etc/apache2/sites-enabled/000-$serverName.conf"
+  createLink "$file" "/etc/apache2/sites-enabled/$id-$serverName.conf"
   createSslCertificate $1
 }
 
