@@ -372,6 +372,7 @@ createWebSite()
   # Possible values include: debug, info, notice, warn, error, crit,
   # alert, emerg.
   call "echo \"LogLevel warn\" >> $file"
+  call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubdomains;\\\"\" >> $file"
   if [ "$testcertificates" = 1 ]
   then
     #   SSL Engine Switch:
