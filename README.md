@@ -1,5 +1,5 @@
 # myserver
-Linux BASH script for setting up a private web server with pre-configured OwnCloud service and automatically renewing Let's Encrypt SSL certificates, based on a basic Ubuntu 18.04 cloud server with root access, using docker images.
+Linux BASH script for setting up a private web server with pre-configured ownCloud service and automatically renewing Let's Encrypt SSL certificates, based on a basic Ubuntu 18.04 cloud server with root access, using docker images.
 
 (c) 2018 by erontarlor
 
@@ -63,7 +63,7 @@ The server should contain the following features:
 - Added one or more additional operating system users (at least one with sudo rights)
 - Some additionally installed basic tools like `gvim`, `curl`, ...
 - Installed Docker environment with `docker-compose`
-- Installed OwnCloud docker container with many pre-installed apps, the same users as for the OS and an *admin* user with the specified admin password
+- Installed ownCloud docker container with many pre-installed apps, the same users as for the OS and an *admin* user with the specified admin password
 - Installed supporting docker containers (mysql, redis)
 - Created docker volumes for permanently storing data (accessable from outside the containers):
     - `owncloud_backup`: `/var/lib/docker/volumes/owncloud_backup/_data`
