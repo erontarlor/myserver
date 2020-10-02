@@ -2,7 +2,7 @@
 #
 # setup.sh V0.2
 #
-# Script for setting up a private web server with pre-configured OwnCloud
+# Script for setting up a private web server with pre-configured NextCloud
 # service and automatically renewing Let's Encrypt SSL certificates, based
 # on a basic Ubuntu 18.04 cloud server with root access, using docker images.
 #
@@ -24,7 +24,7 @@ declare -a userSudo
 userName[0]=admin
 userSudo[0]=1
 
-declare ownCloudPassword=changeme
+declare nextCloudPassword=changeme
 
 declare -i certificateCount=1
 declare -a certificateDomain
@@ -261,7 +261,7 @@ addLetsEncryptRepository()
 addDockerRepository()
 {
   call "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -"
-  call "add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable\" -n -y"
+  call "add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\" -n -y"
 }
 
 
@@ -278,7 +278,7 @@ installLetsEncrypt()
 installDocker()
 {
   call "apt-get install docker-ce -y"
-  call "curl -L \"https://github.com/docker/compose/releases/download/1.22.0/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose"
+  call "curl -L \"https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose"
   call "chmod +x /usr/local/bin/docker-compose"
 }
 
@@ -515,58 +515,58 @@ calculatePasswordSha1()
 }
 
 
-installOwnCloud()
+installNextCloud()
 {
   createWebSite 0
-  askPassword "Enter OwnCloud admin password" $ownCloudPassword
-  ownCloudPassword=$password
-  if [ ! -d owncloud ]
+  askPassword "Enter NextCloud admin password" $nextCloudPassword
+  nextCloudPassword=$password
+  if [ ! -d nextcloud ]
   then
-    call "mkdir owncloud"
+    call "mkdir nextcloud"
   fi
-  call "cd owncloud"
+  call "cd nextcloud"
   declare file=".env"
-  call "echo \"OWNCLOUD_VERSION=10.0\" > $file"
+  call "echo \"NEXTCLOUD_VERSION=10.0\" > $file"
   call "chmod 600 $file"
-  call "echo \"OWNCLOUD_DOMAIN=localhost\" >> $file"
+  call "echo \"NEXTCLOUD_DOMAIN=localhost\" >> $file"
   call "echo \"ADMIN_USERNAME=admin\" >> $file"
-  call "echo \"ADMIN_PASSWORD=$ownCloudPassword\" >> $file"
+  call "echo \"ADMIN_PASSWORD=$nextCloudPassword\" >> $file"
   call "echo \"HTTP_PORT=8080\" >> $file"
   call "wget -O docker-compose.yml https://raw.githubusercontent.com/owncloud-docker/server/master/docker-compose.yml"
   call "sed -e \"s/version: '2.1'/version: '2.2'/\" -i docker-compose.yml"
-  call "sed -e 's/\(- OWNCLOUD_DOMAIN=.*\)$/\1\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_HOST=${certificateDomain[0]}\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_PROTOCOL=https\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_WEBROOT=\/\n\ \ \ \ \ \ - OWNCLOUD_OVERWRITE_CLI_URL=https:\/\/${certificateDomain[0]}\n\ \ \ \ \ \ - OWNCLOUD_HTACCESS_REWRITE_BASE=\//' -i docker-compose.yml"
+  call "sed -e 's/\(- NEXTCLOUD_DOMAIN=.*\)$/\1\n\ \ \ \ \ \ - NEXTCLOUD_OVERWRITE_HOST=${certificateDomain[0]}\n\ \ \ \ \ \ - NEXTCLOUD_OVERWRITE_PROTOCOL=https\n\ \ \ \ \ \ - NEXTCLOUD_OVERWRITE_WEBROOT=\/\n\ \ \ \ \ \ - NEXTCLOUD_OVERWRITE_CLI_URL=https:\/\/${certificateDomain[0]}\n\ \ \ \ \ \ - NEXTCLOUD_HTACCESS_REWRITE_BASE=\//' -i docker-compose.yml"
   call "docker-compose up -d"
   sleep 30
   echo "Changing admin password..."
-  calculatePasswordSha1 "$ownCloudPassword"
-  call "docker-compose exec owncloud mysql -h db -powncloud -P 3306 -u owncloud -D owncloud -e \"update oc_users set password='$passwordSha1' where uid='admin';\""
+  calculatePasswordSha1 "$nextCloudPassword"
+  call "docker-compose exec nextcloud mysql -h db -pnextcloud -P 3306 -u nextcloud -D nextcloud -e \"update oc_users set password='$passwordSha1' where uid='admin';\""
   echo "Installing additional apps..."
-  call "docker-compose exec owncloud occ market:install announcementcenter"
-  call "docker-compose exec owncloud occ market:install audioplayer"
-  call "docker-compose exec owncloud occ market:install brute_force_protection"
-  call "docker-compose exec owncloud occ market:install calendar"
-  call "docker-compose exec owncloud occ market:install cms_pico"
-  call "docker-compose exec owncloud occ market:install contacts"
-  call "docker-compose exec owncloud occ market:install drawio"
-  call "docker-compose exec owncloud occ market:install files_pdfviewer"
-  call "docker-compose exec owncloud occ market:install files_reader"
-  call "docker-compose exec owncloud occ market:install files_texteditor"
-  call "docker-compose exec owncloud occ market:install files_textviewer"
-  call "docker-compose exec owncloud occ market:install gallery"
-  call "docker-compose exec owncloud occ market:install notes"
-  call "docker-compose exec owncloud occ market:install password_policy"
-  call "docker-compose exec owncloud occ market:install polls"
-  call "docker-compose exec owncloud occ market:install tasks"
-  call "docker-compose exec owncloud occ market:install wallpaper"
+  call "docker-compose exec nextcloud occ market:install announcementcenter"
+  call "docker-compose exec nextcloud occ market:install audioplayer"
+  call "docker-compose exec nextcloud occ market:install brute_force_protection"
+  call "docker-compose exec nextcloud occ market:install calendar"
+  call "docker-compose exec nextcloud occ market:install cms_pico"
+  call "docker-compose exec nextcloud occ market:install contacts"
+  call "docker-compose exec nextcloud occ market:install drawio"
+  call "docker-compose exec nextcloud occ market:install files_pdfviewer"
+  call "docker-compose exec nextcloud occ market:install files_reader"
+  call "docker-compose exec nextcloud occ market:install files_texteditor"
+  call "docker-compose exec nextcloud occ market:install files_textviewer"
+  call "docker-compose exec nextcloud occ market:install gallery"
+  call "docker-compose exec nextcloud occ market:install notes"
+  call "docker-compose exec nextcloud occ market:install password_policy"
+  call "docker-compose exec nextcloud occ market:install polls"
+  call "docker-compose exec nextcloud occ market:install tasks"
+  call "docker-compose exec nextcloud occ market:install wallpaper"
   echo "Adding users..."
   declare count=$userCount
   while [ "$count" -gt 0 ]
   do
     let count=count-1
-    call "docker-compose exec -e OC_PASS=\"${userPassword[$count]}\" owncloud occ user:add --password-from-env --display-name=\"${userFullName[$count]}\" --group=\"users\" --email=${userEMail[$count]} ${userName[$count]}"
+    call "docker-compose exec -e OC_PASS=\"${userPassword[$count]}\" nextcloud occ user:add --password-from-env --display-name=\"${userFullName[$count]}\" --group=\"users\" --email=${userEMail[$count]} ${userName[$count]}"
   done
-  echo "Restarting OwnCloud..."
-  call "docker-compose restart owncloud"
+  echo "Restarting NextCloud..."
+  call "docker-compose restart nextcloud"
   call "cd .."
 }
 
@@ -605,7 +605,7 @@ saveSettings()
     call "echo \"userSudo[$count]='${userSudo[$count]}'\" >> $newFile"
     call "echo \"userPassword[$count]='${userPassword[$count]}'\" >> $newFile"
   done
-  call "echo \"ownCloudPassword='$ownCloudPassword'\" >> $newFile"
+  call "echo \"nextCloudPassword='$nextCloudPassword'\" >> $newFile"
   call "echo \"certificateCount=$certificateCount\" >> $newFile"
   declare count=$certificateCount
   while [ "$count" -gt 0 ]
@@ -656,7 +656,7 @@ runStep "Updating package database..." call "apt-get update"
 runStep "Installing Let's Encrypt..." installLetsEncrypt
 runStep "Installing Docker..." installDocker
 runStep "Configuring host's apache web server..." configureApache
-runStep "Installing Docker container OwnCloud..." installOwnCloud
+runStep "Installing Docker container NextCloud..." installNextCloud
 runStep "Restarting host's apache web server..." call "service apache2 restart"
 runStep "Disabling SSH root login..." disableSshRootLogin
 runStep "Changing SSH port..." changeSshPort
