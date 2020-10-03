@@ -1,11 +1,11 @@
 # myserver
-Linux BASH script for setting up a private web server with pre-configured ownCloud service and automatically renewing Let's Encrypt SSL certificates, based on a basic Ubuntu 18.04 cloud server with root access, using docker images.
+Linux BASH script for setting up a private web server with pre-configured NextCloud service and automatically renewing Let's Encrypt SSL certificates, based on a basic Ubuntu 20.04 cloud server with root access, using docker images.
 
-(c) 2018 by erontarlor
+(c) 2020 by erontarlor
 
 ## Prerequisites
 - Cloud server with root permissions (tested with 1&1 Cloud, but likely will work with other providers)
-- Minimal Ubuntu OS installed (tested with Ubuntu 18.04, but likely will work with other Ubuntu based distributions and versions)
+- Minimal Ubuntu OS installed (tested with Ubuntu 20.04, but likely will work with other Ubuntu based distributions and versions)
 - SSH access to the cloud server
 
 ## Installation
@@ -63,13 +63,13 @@ The server should contain the following features:
 - Added one or more additional operating system users (at least one with sudo rights)
 - Some additionally installed basic tools like `gvim`, `curl`, ...
 - Installed Docker environment with `docker-compose`
-- Installed ownCloud docker container with many pre-installed apps, the same users as for the OS and an *admin* user with the specified admin password
+- Installed NextCloud docker container with many pre-installed apps, the same users as for the OS and an *admin* user with the specified admin password
 - Installed supporting docker containers (mysql, redis)
 - Created docker volumes for permanently storing data (accessable from outside the containers):
-    - `owncloud_backup`: `/var/lib/docker/volumes/owncloud_backup/_data`
-    - `owncloud_files`: `/var/lib/docker/volumes/owncloud_files/_data`
-    - `owncloud_mysql`: `/var/lib/docker/volumes/owncloud_mysql/_data`
-    - `owncloud_redis`: `/var/lib/docker/volumes/owncloud_redis/_data`
+    - `nextcloud_backup`: `/var/lib/docker/volumes/nextcloud_backup/_data`
+    - `nextcloud_files`: `/var/lib/docker/volumes/nextcloud_files/_data`
+    - `nextcloud_mysql`: `/var/lib/docker/volumes/nextcloud_mysql/_data`
+    - `nextcloud_redis`: `/var/lib/docker/volumes/nextcloud_redis/_data`
 - Installed Let's Encrypt environment with cron job for automatically renewing the certificates
 - Configured Apache web server as proxy for redirecting the incoming https requests to the different docker containers
 - Disabled root login for SSH
