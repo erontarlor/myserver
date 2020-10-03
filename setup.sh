@@ -254,7 +254,7 @@ installTools()
 
 addLetsEncryptRepository()
 {
-  call "add-repository universe -n -y"
+  call "add-apt-repository universe -n -y"
 }
 
 
