@@ -12,11 +12,11 @@ Linux BASH script for setting up a private web server with pre-configured NextCl
 Either login to your cloud server as *root* and download the script `setup.sh` from GitHub directly onto the cloud server (if `curl` is already installed there):
 
     ssh -l root yourserver
-    curl https://github.com/erontarlor/myserver/raw/master/setup.sh --output setup.sh
+    curl https://github.com/erontarlor/myserver/raw/master/setup.sh --output setup.sh --location
 
 Or download the script locally, copy it to your cloud server via `scp` and login to the server afterwards:
 
-    curl https://github.com/erontarlor/myserver/raw/master/setup.sh --output setup.sh
+    curl https://github.com/erontarlor/myserver/raw/master/setup.sh --output setup.sh --location
     scp setup.sh root@yourserver:/root/setup.sh
     ssh -l root yourserver
 
