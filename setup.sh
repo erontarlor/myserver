@@ -632,7 +632,7 @@ installNextCloud()
   do
     let count=count-1
     call "docker-compose exec -u www-data -e OC_PASS=\"${userPassword[$count]}\" nextcloud php occ user:add --password-from-env --display-name=\"${userFullName[$count]}\" --group=\"users\" ${userName[$count]}"
-    call "docker-compose exec -u www-data nextcloud php occ user:setting ${userName[$count]} settings email "${userEMail[$count]}"
+    call "docker-compose exec -u www-data nextcloud php occ user:setting ${userName[$count]} settings email \"${userEMail[$count]}\""
   done
   echo "Restarting NextCloud..."
   call "docker-compose restart nextcloud"
