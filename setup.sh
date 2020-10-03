@@ -309,7 +309,7 @@ createSslCertificate()
   echo "Creating SSL certificate for domain ${certificateDomain[$1]}..."
   if [ "$testCertificates" = 1 ]
   then
-    call "openssl genrsa -out ${certificateDomain[$1]}.key 1024"
+    call "openssl genrsa -out ${certificateDomain[$1]}.key 2048"
     call "openssl req -new -subj \"/C=${certificateCountry[$1]}/ST=${certificateState[$1]}/L=${certificateCity[$1]}/O=${certificateOrganization[$1]}/OU=none/CN=${certificateDomain[$1]}/Email=${certificateEMail[$1]}\" -key ${certificateDomain[$1]}.key -out ${certificateDomain[$1]}.pem"
     call "cp ${certificateDomain[$1]}.key ${certificateDomain[$1]}.key.org"
     call "cp ${certificateDomain[$1]}.pem ${certificateDomain[$1]}.pem.org"
