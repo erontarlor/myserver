@@ -356,7 +356,7 @@ createWebSite()
   declare serverName=${certificateDomain[$1]}
   declare file="/etc/apache2/sites-available/$id-$serverName.conf"
   call "echo \"<IfModule mod_ssl.c>\" > $file"
-  if [ "$testcertificates" = 1 ]
+  if [ "$testCertificates" = 1 ]
   then
     call "echo \"<VirtualHost *:443>\" >> $file"
   else
@@ -373,7 +373,7 @@ createWebSite()
   # Possible values include: debug, info, notice, warn, error, crit,
   # alert, emerg.
   call "echo \"LogLevel warn\" >> $file"
-  if [ "$testcertificates" = 1 ]
+  if [ "$testCertificates" = 1 ]
   then
     #   SSL Engine Switch:
     #   Enable/Disable SSL for this virtual host.
