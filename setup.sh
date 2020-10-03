@@ -4,7 +4,7 @@
 #
 # Script for setting up a private web server with pre-configured NextCloud
 # service and automatically renewing Let's Encrypt SSL certificates, based
-# on a basic Ubuntu 18.04 cloud server with root access, using docker images.
+# on a basic Ubuntu 20.04 cloud server with root access, using docker images.
 #
 # (c) 2020 by erontarlor
 #
@@ -254,7 +254,7 @@ installTools()
 
 addLetsEncryptRepository()
 {
-  call "add-apt-repository ppa:certbot/certbot -n -y"
+  call "add-repository universe -n -y"
 }
 
 
@@ -267,7 +267,7 @@ addDockerRepository()
 
 installLetsEncrypt()
 {
-  call "apt install python-certbot-apache -y"
+  call "apt install certbot python3-certbot-apache -y"
   declare file="/etc/cron.weekly/letsencrypt"
   call "echo \"#!/bin/sh\" > $file"
   call "echo \"certbot renew\" >> $file"
