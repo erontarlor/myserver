@@ -70,7 +70,7 @@ call()
   then
     echo "$1"
   else
-    eval $1
+    eval "$1"
   fi
   if [ $? -gt 0 ]
   then
@@ -525,13 +525,6 @@ installNextCloud()
     call "mkdir nextcloud"
   fi
   call "cd nextcloud"
-  declare file=".env"
-  call "echo \"NEXTCLOUD_VERSION=10.0\" > $file"
-  call "chmod 600 $file"
-  call "echo \"NEXTCLOUD_DOMAIN=localhost\" >> $file"
-  call "echo \"ADMIN_USERNAME=admin\" >> $file"
-  call "echo \"ADMIN_PASSWORD=$nextCloudPassword\" >> $file"
-  call "echo \"HTTP_PORT=8080\" >> $file"
   declare compose="docker-compose.yml"
   call "echo \"version: '2'\" > $compose"
   call "echo \"\" >> $compose"
@@ -550,12 +543,12 @@ installNextCloud()
   call "echo \"    image: nextcloud\" >> $compose"
   call "echo \"    restart: always\" >> $compose"
   call "echo \"    ports:\" >> $compose"
-  call "echo \"      - \${HTTP_PORT}:8080\" >> $compose"
+  call "echo \"      - 8080:8080\" >> $compose"
   call "echo \"    links:\" >> $compose"
   call "echo \"      - db\" >> $compose"
   call "echo \"      - redis\" >> $compose"
   call "echo \"    environment:\" >> $compose"
-  call "echo \"      - OWNCLOUD_DOMAIN=\${OWNCLOUD_DOMAIN}\" >> $compose"
+  call "echo \"      - OWNCLOUD_DOMAIN=localhost\" >> $compose"
   call "echo \"      - OWNCLOUD_OVERWRITE_HOST=${certificateDomain[0]}\" >> $compose"
   call "echo \"      - OWNCLOUD_OVERWRITE_PROTOCOL=https\" >> $compose"
   call "echo \"      - OWNCLOUD_OVERWRITE_WEBROOT=/\" >> $compose"
@@ -566,8 +559,8 @@ installNextCloud()
   call "echo \"      - OWNCLOUD_DB_USERNAME=owncloud\" >> $compose"
   call "echo \"      - OWNCLOUD_DB_PASSWORD=owncloud\" >> $compose"
   call "echo \"      - OWNCLOUD_DB_HOST=db\" >> $compose"
-  call "echo \"      - OWNCLOUD_ADMIN_USERNAME=\${ADMIN_USERNAME}\" >> $compose"
-  call "echo \"      - OWNCLOUD_ADMIN_PASSWORD=\${ADMIN_PASSWORD}\" >> $compose"
+  call "echo \"      - OWNCLOUD_ADMIN_USERNAME=admin\" >> $compose"
+  call "echo \"      - OWNCLOUD_ADMIN_PASSWORD=$nextCloudPassword\" >> $compose"
   call "echo \"      - OWNCLOUD_MYSQL_UTF8MB4=true\" >> $compose"
   call "echo \"      - OWNCLOUD_REDIS_ENABLED=true\" >> $compose"
   call "echo \"      - OWNCLOUD_REDIS_HOST=redis\" >> $compose"
