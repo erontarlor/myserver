@@ -543,7 +543,7 @@ installNextCloud()
   call "echo \"    image: nextcloud\" >> $compose"
   call "echo \"    restart: always\" >> $compose"
   call "echo \"    ports:\" >> $compose"
-  call "echo \"      - 8080:8080\" >> $compose"
+  call "echo \"      - 8080:80\" >> $compose"
   call "echo \"    links:\" >> $compose"
   call "echo \"      - db\" >> $compose"
   call "echo \"      - redis\" >> $compose"
