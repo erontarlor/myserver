@@ -365,9 +365,9 @@ createWebSite()
   call "echo \"<IfModule mod_ssl.c>\" > $file"
   if [ "$testCertificates" = 1 ]
   then
-    call "echo \"<VirtualHost $serverName:443>\" >> $file"
+    call "echo \"<VirtualHost *:443>\" >> $file"
   else
-    call "echo \"<VirtualHost $serverName:80>\" >> $file"
+    call "echo \"<VirtualHost *:80>\" >> $file"
     call "echo \"DocumentRoot /var/www/html\" >> $file"
   fi
   call "echo \"ServerName $serverName\" >> $file"
