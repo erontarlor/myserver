@@ -418,9 +418,6 @@ createWebSite()
   # Possible values include: debug, info, notice, warn, error, crit,
   # alert, emerg.
   call "echo \"LogLevel warn\" >> $file"
-  call "echo \"Header unset X-Robots-Tag\" >> $file"
-  call "echo \"Header unset Pragma\" >> $file"
-  call "echo \"Header set Cache-Control \"public, must-revalidate\"\" >> $file"
 
   if [ "$testCertificates" = 1 ]
   then
@@ -546,6 +543,9 @@ createWebSite()
     call "echo \"BrowserMatch \\\"MSIE [17-9]\\\" ssl-unclean-shutdown\" >> $file"
   fi
   call "echo \"<IfModule mod_headers.c>\" >> $file"
+  call "echo \"Header unset X-Robots-Tag\" >> $file"
+  call "echo \"Header unset Pragma\" >> $file"
+  call "echo \"Header set Cache-Control \\\"public, must-revalidate\\\"\" >> $file"
   call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubDomains; preload\\\"\" >> $file"
   call "echo \"</IfModule>\" >> $file"
   call "echo \"</VirtualHost>\" >> $file"
