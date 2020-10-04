@@ -616,7 +616,7 @@ installNextCloud()
 #  call "echo \"      timeout: 10s\" >> $compose"
 #  call "echo \"      retries: 5\" >> $compose"
   call "echo \"    volumes:\" >> $compose"
-  call "echo \"      - nextcloud:/mnt/data\" >> $compose"
+  call "echo \"      - nextcloud:/var/www/html\" >> $compose"
   call "echo \"\" >> $compose"
   call "echo \"  db:\" >> $compose"
   call "echo \"    image: mariadb\" >> $compose"
