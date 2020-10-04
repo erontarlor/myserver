@@ -651,7 +651,7 @@ installNextCloud()
   call "echo \"    volumes:\" >> $compose"
   call "echo \"      - redis:/var/lib/redis\" >> $compose"
   call "docker-compose up -d"
-  sleep 30
+  sleep 10
   echo "Changing admin password..."
   call "docker-compose exec -u www-data nextcloud php occ maintenance:install"
 #  calculatePasswordSha1 "$nextCloudPassword"
