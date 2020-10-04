@@ -301,6 +301,13 @@ configureApache()
   call "a2enmod proxy_html"
   call "a2enmod socache_shmcb"
   call "a2enmod ssl"
+  echo "Adding virtual hosts..."
+  declare count=$certificateCount
+  while [ "$count" -gt 0 ]
+  do
+    let count=count-1
+    createWebSite $count
+  done
 }
 
 
@@ -358,21 +365,63 @@ createWebSite()
   call "echo \"<IfModule mod_ssl.c>\" > $file"
   if [ "$testCertificates" = 1 ]
   then
-    call "echo \"<VirtualHost *:443>\" >> $file"
+    call "echo \"<VirtualHost $serverName:443>\" >> $file"
   else
-    call "echo \"<VirtualHost *:80>\" >> $file"
+    call "echo \"<VirtualHost $serverName:80>\" >> $file"
     call "echo \"DocumentRoot /var/www/html\" >> $file"
   fi
   call "echo \"ServerName $serverName\" >> $file"
   #call "echo \"ServerAlias www.$serverName\" >> $file"
   call "echo \"ServerAdmin ${certificateEMail[$1]}\" >> $file"
-  call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
-  call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
+  
+  if [ "$serverName" == "nextcloud.gaudiversum.de" ]
+  then
+    call "echo \"ProxyPass /sites/ http://localhost:8080//index.php/apps/cms_pico/pico/\" >> $file"
+    call "echo \"ProxyPassReverse /sites/ http://localhost:8080//index.php/apps/cms_pico/pico/\" >> $file"
+    call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
+    call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
+  elif [ "$serverName" == "www.gaudiumludendi.de" ]
+  then
+    call "echo \"ProxyPass /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/gaudiumludendi/assets/robots.txt\" >> $file"
+    call "echo \"ProxyPassReverse /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/gaudiumludendi/assets/robots.txt\" >> $file"
+    call "echo \"ProxyPass /index.php/ http://localhost:8080/index.php/\" >> $file"
+    call "echo \"ProxyPassReverse /index.php/ http://localhost:8080/index.php/\" >> $file"
+    call "echo \"ProxyPass /custom/ http://localhost:8080/custom/\" >> $file"
+    call "echo \"ProxyPassReverse /custom/ http://localhost:8080/custom/\" >> $file"
+    call "echo \"ProxyPass /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
+    call "echo \"ProxyPassReverse /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
+    call "echo \"ProxyPass / http://localhost:8080//index.php/apps/cms_pico/pico/gaudiumludendi/\" >> $file"
+    call "echo \"ProxyPassReverse / http://localhost:8080//index.php/apps/cms_pico/pico/gaudiumludendi\" >> $file"
+  elif [ "$serverName" == "gallery.gaudiversum.de" ]
+  then
+    call "echo \"ProxyPass /froschteich http://localhost:8080/apps/gallery/s/nzWzBHHMdwQCfa9\" >> $file"
+    call "echo \"ProxyPassReverse /froschteich http://localhost:8080/apps/gallery/s/nzWzBHHMdwQCfa9\" >> $file"
+    call "echo \"ProxyPass /tkd http://localhost:8080/apps/gallery/s/67EiDLHLhUHuJ2R\" >> $file"
+    call "echo \"ProxyPassReverse /tkd http://localhost:8080/apps/gallery/s/67EiDLHLhUHuJ2R\" >> $file"
+    call "echo \"ProxyPass /aufbaukurs http://localhost:8080/apps/gallery/s/QBo0TpxiRp0QLuf\" >> $file"
+    call "echo \"ProxyPassReverse /aufbaukurs http://localhost:8080/apps/gallery/s/QBo0TpxiRp0QLuf\" >> $file"
+    call "echo \"ProxyPass /tanzen http://localhost:8080/s/d6W83ahgNJ1lJj8\" >> $file"
+    call "echo \"ProxyPassReverse /tanzen http://localhost:8080/s/d6W83ahgNJ1lJj8\" >> $file"
+    call "echo \"ProxyPass /stopmotion http://localhost:8080/s/9EpfG54Is6lq22J\" >> $file"
+    call "echo \"ProxyPassReverse /stopmotion http://localhost:8080/s/9EpfG54Is6lq22J\" >> $file"
+    call "echo \"ProxyPass /warriorsparty http://localhost:8080/s/1cSky3hYafYGXUG\" >> $file"
+    call "echo \"ProxyPassReverse /warriorsparty http://localhost:8080/s/1cSky3hYafYGXUG\" >> $file"
+    call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
+    call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
+  else
+    call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
+    call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
+  fi
+  
   call "echo 'ErrorLog \${APACHE_LOG_DIR}/error.log' >> $file"
   call "echo 'CustomLog \${APACHE_LOG_DIR}/ssl_access.log combined' >> $file"
   # Possible values include: debug, info, notice, warn, error, crit,
   # alert, emerg.
   call "echo \"LogLevel warn\" >> $file"
+  call "echo \"Header unset X-Robots-Tag\" >> $file"
+  call "echo \"Header unset Pragma\" >> $file"
+  call "echo \"Header set Cache-Control \"public, must-revalidate\"\" >> $file"
+
   if [ "$testCertificates" = 1 ]
   then
     #   SSL Engine Switch:
@@ -517,7 +566,6 @@ calculatePasswordSha1()
 
 installNextCloud()
 {
-  createWebSite 0
   askPassword "Enter NextCloud admin password" $nextCloudPassword
   nextCloudPassword=$password
   if [ ! -d nextcloud ]
