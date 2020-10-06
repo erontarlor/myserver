@@ -543,9 +543,12 @@ createWebSite()
     call "echo \"BrowserMatch \\\"MSIE [17-9]\\\" ssl-unclean-shutdown\" >> $file"
   fi
   call "echo \"<IfModule mod_headers.c>\" >> $file"
-  call "echo \"Header unset X-Robots-Tag\" >> $file"
-  call "echo \"Header unset Pragma\" >> $file"
-  call "echo \"Header set Cache-Control \\\"public, must-revalidate\\\"\" >> $file"
+  if [ "$serverName" == "www.gaudiumludendi.de" ]
+  then
+    call "echo \"Header unset X-Robots-Tag\" >> $file"
+    call "echo \"Header unset Pragma\" >> $file"
+    call "echo \"Header set Cache-Control \\\"public, must-revalidate\\\"\" >> $file"
+  fi
   call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubDomains; preload\\\"\" >> $file"
   call "echo \"</IfModule>\" >> $file"
   call "echo \"</VirtualHost>\" >> $file"
@@ -610,6 +613,7 @@ installNextCloud()
   call "echo \"      - HTACCESS_REWRITE_BASE=/\" >> $compose"
   call "echo \"      - MYSQL_UTF8MB4=true\" >> $compose"
   call "echo \"      - REDIS_HOST=redis\" >> $compose"
+  call "echo \"      - REDIS_HOST_PASSWORD=redis\" >> $compose"
 #  call "echo \"    healthcheck:\" >> $compose"
 #  call "echo \"      test: ['CMD', '/usr/bin/healthcheck']\" >> $compose"
 #  call "echo \"      interval: 30s\" >> $compose"
@@ -640,6 +644,7 @@ installNextCloud()
   call "echo \"\" >> $compose"
   call "echo \"  redis:\" >> $compose"
   call "echo \"    image: redis\" >> $compose"
+  call "echo \"    command: --requirepass redis\" >> $compose"
   call "echo \"    restart: always\" >> $compose"
   call "echo \"    environment:\" >> $compose"
   call "echo \"      - REDIS_DATABASES=1\" >> $compose"
