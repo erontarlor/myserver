@@ -388,6 +388,8 @@ createWebSite()
     call "echo \"ProxyPassReverse /index.php/ http://localhost:8080/index.php/\" >> $file"
     call "echo \"ProxyPass /custom/ http://localhost:8080/custom/\" >> $file"
     call "echo \"ProxyPassReverse /custom/ http://localhost:8080/custom/\" >> $file"
+    call "echo \"ProxyPass /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
+    call "echo \"ProxyPassReverse /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
     call "echo \"ProxyPass /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
     call "echo \"ProxyPassReverse /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
     call "echo \"ProxyPass / http://localhost:8080//index.php/apps/cms_pico/pico/gaudiumludendi/\" >> $file"
