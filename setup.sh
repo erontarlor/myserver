@@ -248,7 +248,7 @@ addAdditionalUser()
 installTools()
 {
   call "apt-get update"
-  call "apt-get install vim-gtk apt-transport-https ca-certificates curl software-properties-common -y"
+  call "apt-get install vim-gtk3 apt-transport-https ca-certificates curl software-properties-common -y"
 }
 
 
