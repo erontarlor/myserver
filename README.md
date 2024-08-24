@@ -32,7 +32,7 @@ After setting up your server has finished, your entered data will be stored in a
 
 You can use this file later on, to re-run the setup. The script will then use the previously entered data as defaults for all the questions. Just hit \[ENTER\] to use the defaults.
 
-Yout can also re-run the setup in auto mode, without entering all data again:
+You can also re-run the setup in auto mode, without entering all data again:
 
     ./setup.sh -auto
 
