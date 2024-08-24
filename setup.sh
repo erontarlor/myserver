@@ -6,7 +6,7 @@
 # service and automatically renewing Let's Encrypt SSL certificates, based
 # on a basic Ubuntu 20.04 cloud server with root access, using docker images.
 #
-# (c) 2020 by erontarlor
+# (c) 2024 by erontarlor
 #
 
 declare -i step=1
