@@ -695,6 +695,25 @@ installNextCloud()
 }
 
 
+installPicoCms()
+{
+  call "cd nextcloud"
+  call "docker-compose exec -u root nextcloud apt-get update"
+  call "docker-compose exec -u root nextcloud apt-get install git -y"
+  call "docker-compose exec -u www-data nextcloud rm -rf apps/cms_pico"
+  call "docker-compose exec -u www-data nextcloud git clone https://github.com/nextcloud/cms_pico.git apps/cms_pico"
+  call "docker-compose exec -u www-data nextcloud rm apps/cms_pico/composer.lock"
+  call "docker-compose exec -u www-data nextcloud sed -i '/incompass\\/coverage/d' apps/cms_pico/composer.json"
+  call "docker-compose exec -u www-data nextcloud sed -i -n '1h;2,\$H;\${g;s/,[ \\n]*\\}/\\n\\}/g;p}' apps/cms_pico/composer.json"
+  call "docker-compose exec -u www-data nextcloud php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\""
+  call "docker-compose exec -u www-data nextcloud php -r \"if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;\""
+  call "docker-compose exec -u www-data nextcloud php composer-setup.php"
+  call "docker-compose exec -u www-data nextcloud php -r \"unlink('composer-setup.php');\""
+  call "docker-compose exec -u www-data -w /var/www/html/apps/cms_pico nextcloud php ../../composer.phar install"
+  call "cd .."
+}
+
+
 disableSshRootLogin()
 {
   call "sed -e 's/^\( *PermitRootLogin .*\)$/#\1/' -i $sshdConfig"
@@ -781,6 +800,7 @@ runStep "Installing Let's Encrypt..." installLetsEncrypt
 runStep "Installing Docker..." installDocker
 runStep "Configuring host's apache web server..." configureApache
 runStep "Installing Docker container NextCloud..." installNextCloud
+runStep "Installing Pico CMS..." installPicoCms
 runStep "Restarting host's apache web server..." call "service apache2 restart"
 runStep "Disabling SSH root login..." disableSshRootLogin
 runStep "Changing SSH port..." changeSshPort
