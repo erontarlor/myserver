@@ -668,7 +668,8 @@ installNextCloud()
   call "docker-compose exec -u www-data nextcloud php occ app:install audioplayer || true"
 #  call "docker-compose exec -u www-data nextcloud php occ app:install brute_force_protection || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install calendar || true"
-  call "docker-compose exec -u www-data nextcloud php occ app:install cms_pico || true"
+# Enable after Pico CMS works out of the box, again, for Nextcloud 29
+#  call "docker-compose exec -u www-data nextcloud php occ app:install cms_pico || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install contacts || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install drawio || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install files_pdfviewer || true"
@@ -711,6 +712,9 @@ installPicoCms()
   call "docker-compose exec -u www-data nextcloud php -r \"unlink('composer-setup.php');\""
   call "docker-compose exec -u www-data -w /var/www/html/apps/cms_pico nextcloud php ../../composer.phar install"
   call "cd .."
+  # Fix Pico CMS (Enable after Pico CMS works out of the box, again, for Nextcloud 29)
+  sed -i -n "1h;2,\$H;\${g;s/\$icon[ \\t\\n]*.tooltip('destroy')[ \\t\\n]*.attr('title', compatReason)[ \\t\\n]*.tooltip();//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/js/admin.js
+  sed -i -n "1h;2,\$H;\${g;s/\$baseElement.find('.has-tooltip').tooltip('hide');//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/js/pico.js
 }
 
 
@@ -800,6 +804,7 @@ runStep "Installing Let's Encrypt..." installLetsEncrypt
 runStep "Installing Docker..." installDocker
 runStep "Configuring host's apache web server..." configureApache
 runStep "Installing Docker container NextCloud..." installNextCloud
+# Disable after Pico CMS works out of the box, again, for Nextcloud 29
 runStep "Installing Pico CMS..." installPicoCms
 runStep "Restarting host's apache web server..." call "service apache2 restart"
 runStep "Disabling SSH root login..." disableSshRootLogin
