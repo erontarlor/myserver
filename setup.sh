@@ -715,7 +715,7 @@ installPicoCms()
   # Fix Pico CMS (Enable after Pico CMS works out of the box, again, for Nextcloud 29)
   sed -i -n "1h;2,\$H;\${g;s/\$icon[ \\t\\n]*.tooltip('destroy')[ \\t\\n]*.attr('title', compatReason)[ \\t\\n]*.tooltip();//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/js/admin.js
   sed -i -n "1h;2,\$H;\${g;s/\$baseElement.find('.has-tooltip').tooltip('hide');//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/js/pico.js
-  sed -i -n "1h;2,\$H;\${g;s/return \$this->getHtmlPurifier()->purify(\$content);//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/lib
+  sed -i -n "1h;2,\$H;\${g;s/return \$this->getHtmlPurifier()->purify(\$content);//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/lib/Pico.php
 }
 
 
