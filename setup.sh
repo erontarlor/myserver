@@ -721,8 +721,11 @@ installPicoCms()
 
 disableSshRootLogin()
 {
-  call "sed -e 's/^\( *PermitRootLogin .*\)$/#\1/' -i $sshdConfig"
-  call "echo \"PermitRootLogin no\" >> $sshdConfig"
+  if grep -q -e '^ *PermitRootLogin' $sshdConfig; then
+    call "sed -e 's/^\( *PermitRootLogin\).*\$/\1 no/' -i $sshdConfig"
+  else
+    call "echo \"PermitRootLogin no\" >> $sshdConfig"
+  fi
 }
 
 
@@ -731,8 +734,11 @@ changeSshPort()
   askInteger "Which port do you want to use for SSH" $sshdPort
   sshdPort=$integer
   echo "Changing SSL port to $sshdPort..."
-  call "sed -e 's/^\( *Port .*$\)/#\1/' -i $sshdConfig"
-  call "echo \"Port $sshdPort\" >> $sshdConfig"
+  if grep -q -e '^ *Port' $sshdConfig; then
+    call "sed -e 's/^\( *Port\).*\$/\1 $sshdPort/' -i $sshdConfig"
+  else
+    call "echo \"Port $sshdPort\" >> $sshdConfig"
+  fi
 }
 
 
