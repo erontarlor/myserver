@@ -701,21 +701,21 @@ installPicoCms()
   call "cd nextcloud"
   call "docker-compose exec -u root nextcloud apt-get update"
   call "docker-compose exec -u root nextcloud apt-get install git -y"
-  call "docker-compose exec -u www-data nextcloud rm -rf apps/cms_pico"
-  call "docker-compose exec -u www-data nextcloud git clone https://github.com/nextcloud/cms_pico.git apps/cms_pico"
-  call "docker-compose exec -u www-data nextcloud rm apps/cms_pico/composer.lock"
-  call "docker-compose exec -u www-data nextcloud sed -i '/incompass\\/coverage/d' apps/cms_pico/composer.json"
-  call "docker-compose exec -u www-data nextcloud sed -i -n '1h;2,\$H;\${g;s/,[ \\n]*\\}/\\n\\}/g;p}' apps/cms_pico/composer.json"
+  call "docker-compose exec -u www-data nextcloud rm -rf custom_apps/cms_pico"
+  call "docker-compose exec -u www-data nextcloud git clone https://github.com/nextcloud/cms_pico.git custom_apps/cms_pico"
+  call "docker-compose exec -u www-data nextcloud rm custom_apps/cms_pico/composer.lock"
+  call "docker-compose exec -u www-data nextcloud sed -i '/incompass\\/coverage/d' custom_apps/cms_pico/composer.json"
+  call "docker-compose exec -u www-data nextcloud sed -i -n '1h;2,\$H;\${g;s/,[ \\n]*\\}/\\n\\}/g;p}' custom_apps/cms_pico/composer.json"
   call "docker-compose exec -u www-data nextcloud php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\""
   call "docker-compose exec -u www-data nextcloud php -r \"if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;\""
   call "docker-compose exec -u www-data nextcloud php composer-setup.php"
   call "docker-compose exec -u www-data nextcloud php -r \"unlink('composer-setup.php');\""
-  call "docker-compose exec -u www-data -w /var/www/html/apps/cms_pico nextcloud php ../../composer.phar install"
+  call "docker-compose exec -u www-data -w /var/www/html/custom_apps/cms_pico nextcloud php ../../composer.phar install"
   call "cd .."
   # Fix Pico CMS (Enable after Pico CMS works out of the box, again, for Nextcloud 29)
-  sed -i -n "1h;2,\$H;\${g;s/\$icon[ \\t\\n]*.tooltip('destroy')[ \\t\\n]*.attr('title', compatReason)[ \\t\\n]*.tooltip();//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/js/admin.js
-  sed -i -n "1h;2,\$H;\${g;s/\$baseElement.find('.has-tooltip').tooltip('hide');//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/js/pico.js
-  sed -i -n "1h;2,\$H;\${g;s/return \$this->getHtmlPurifier()->purify(\$content);//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/apps/cms_pico/lib/Pico.php
+  sed -i -n "1h;2,\$H;\${g;s/\$icon[ \\t\\n]*.tooltip('destroy')[ \\t\\n]*.attr('title', compatReason)[ \\t\\n]*.tooltip();//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/custom_apps/cms_pico/js/admin.js
+  sed -i -n "1h;2,\$H;\${g;s/\$baseElement.find('.has-tooltip').tooltip('hide');//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/custom_apps/cms_pico/js/pico.js
+  sed -i -n "1h;2,\$H;\${g;s/return \$this->getHtmlPurifier()->purify(\$content);//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/custom_apps/cms_pico/lib/Pico.php
 }
 
 
