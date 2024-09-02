@@ -20,6 +20,11 @@ declare -a certificateOrganization
 declare -a certificateEMail
 certificateDomain[0]=localhost
 
+declare configFile=setup.cfg
+if [ -e "$configFile" ]
+then
+  source $configFile
+fi
 
 getArgs()
 {
