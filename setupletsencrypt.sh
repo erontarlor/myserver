@@ -186,6 +186,20 @@ createWebSite()
     call "echo \"ProxyPassReverse /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
     call "echo \"ProxyPass / http://localhost:8080//index.php/apps/cms_pico/pico/gaudiumludendi/\" >> $file"
     call "echo \"ProxyPassReverse / http://localhost:8080//index.php/apps/cms_pico/pico/gaudiumludendi\" >> $file"
+  elif [ "$serverName" == "seifenoper.gaudiversum.de" ]
+  then
+    call "echo \"ProxyPass /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/soapopera/assets/robots.txt\" >> $file"
+    call "echo \"ProxyPassReverse /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/soapopera/assets/robots.txt\" >> $file"
+    call "echo \"ProxyPass /index.php/ http://localhost:8080/index.php/\" >> $file"
+    call "echo \"ProxyPassReverse /index.php/ http://localhost:8080/index.php/\" >> $file"
+    call "echo \"ProxyPass /custom/ http://localhost:8080/custom/\" >> $file"
+    call "echo \"ProxyPassReverse /custom/ http://localhost:8080/custom/\" >> $file"
+    call "echo \"ProxyPass /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
+    call "echo \"ProxyPassReverse /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
+    call "echo \"ProxyPass /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
+    call "echo \"ProxyPassReverse /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
+    call "echo \"ProxyPass / http://localhost:8080//index.php/apps/cms_pico/pico/soapopera/\" >> $file"
+    call "echo \"ProxyPassReverse / http://localhost:8080//index.php/apps/cms_pico/pico/soapopera\" >> $file"
   elif [ "$serverName" == "gallery.gaudiversum.de" ]
   then
     call "echo \"ProxyPass /froschteich http://localhost:8080/apps/gallery/s/nzWzBHHMdwQCfa9\" >> $file"
