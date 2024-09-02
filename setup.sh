@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# setup.sh V0.3
+# setup.sh V0.4
 #
 # Script for setting up a private web server with pre-configured NextCloud
 # service and automatically renewing Let's Encrypt SSL certificates, based
