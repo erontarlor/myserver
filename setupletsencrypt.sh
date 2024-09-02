@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# setup.sh V0.1
+# setup.sh V0.4
 #
 # Script for setting up the automatically renewing Let's Encrypt SSL certificates.
 #
