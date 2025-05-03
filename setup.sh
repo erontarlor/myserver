@@ -426,6 +426,11 @@ createWebSite()
     call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
   elif [ "$serverName" == "sites.gaudiversum.de" ]
   then
+    call "echo \"<Directory /var/www/html>\" >> $file"
+    call "echo \"Options +FollowSymLinks\" >> $file"
+    call "echo \"AllowOverride None\" >> $file"
+    call "echo \"Require all granted\" >> $file"
+    call "echo \"</Directory>\" >> $file"
     call "mv /var/www/html /var/www/html.orig"
     createLink "/var/lib/docker/volumes/nextcloud_nextcloud/_data/data/carlos/files/Websites/html" "/var/www/html"
   else
