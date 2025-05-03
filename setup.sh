@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# setup.sh V0.4
+# setup.sh V0.5
 #
 # Script for setting up a private web server with pre-configured NextCloud
 # service and automatically renewing Let's Encrypt SSL certificates, based
 # on a basic Ubuntu 20.04 cloud server with root access, using docker images.
 #
-# (c) 2024 by erontarlor
+# (c) 2025 by erontarlor
 #
 
 declare -i step=1
@@ -424,6 +424,10 @@ createWebSite()
     call "echo \"ProxyPassReverse /warriorsparty http://localhost:8080/s/1cSky3hYafYGXUG\" >> $file"
     call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
     call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
+  elif [ "$serverName" == "sites.gaudiversum.de" ]
+  then
+    call "mv /var/www/html /var/www/html.orig"
+    createLink "/var/lib/docker/volumes/nextcloud_nextcloud/_data/data/carlos/files/Websites/html" "/var/www/html"
   else
     call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
     call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
