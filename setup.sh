@@ -738,7 +738,7 @@ installPicoCms()
   call "docker-compose exec -u www-data nextcloud sed -i '/incompass\\/coverage/d' custom_apps/cms_pico/composer.json"
   call "docker-compose exec -u www-data nextcloud sed -i -n '1h;2,\$H;\${g;s/,[ \\n]*\\}/\\n\\}/g;p}' custom_apps/cms_pico/composer.json"
   call "docker-compose exec -u www-data nextcloud php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\""
-  call "docker-compose exec -u www-data nextcloud php -r \"if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;\""
+  call "docker-compose exec -u www-data nextcloud php -r \"if (hash_file('sha384', 'composer-setup.php') === 'c8b085408188070d5f52bcfe4ecfbee5f727afa458b2573b8eaaf77b3419b0bf2768dc67c86944da1544f06fa544fd47') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;\""
   call "docker-compose exec -u www-data nextcloud php composer-setup.php"
   call "docker-compose exec -u www-data nextcloud php -r \"unlink('composer-setup.php');\""
   call "docker-compose exec -u www-data -w /var/www/html/custom_apps/cms_pico nextcloud php ../../composer.phar install"
