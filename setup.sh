@@ -741,6 +741,7 @@ installPicoCms()
   call "docker-compose exec -u www-data nextcloud php -r \"if (hash_file('sha384', 'composer-setup.php') === 'c8b085408188070d5f52bcfe4ecfbee5f727afa458b2573b8eaaf77b3419b0bf2768dc67c86944da1544f06fa544fd47') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;\""
   call "docker-compose exec -u www-data nextcloud php composer-setup.php"
   call "docker-compose exec -u www-data nextcloud php -r \"unlink('composer-setup.php');\""
+  call "docker-compose exec -u www-data -w /var/www/html/custom_apps/cms_pico nextcloud php ../../composer.phar config policy.advisories.block false"
   call "docker-compose exec -u www-data -w /var/www/html/custom_apps/cms_pico nextcloud php ../../composer.phar install"
   call "cd .."
   # Fix Pico CMS (Enable after Pico CMS works out of the box, again, for Nextcloud 29)
