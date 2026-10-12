@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# setup.sh V0.5
+# setup.sh V0.6
 #
 # Script for setting up a private web server with pre-configured NextCloud
 # service and automatically renewing Let's Encrypt SSL certificates, based
 # on a basic Ubuntu 20.04 cloud server with root access, using docker images.
 #
-# (c) 2025 by erontarlor
+# (c) 2026 by erontarlor
 #
 
 declare -i step=1
@@ -260,8 +260,16 @@ addLetsEncryptRepository()
 
 addDockerRepository()
 {
-  call "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -"
-  call "add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\" -n -y"
+  call "install -m 0755 -d /etc/apt/keyrings"
+  call "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc"
+  call "chmod a+r /etc/apt/keyrings/docker.asc"
+  declare file="/etc/apt/sources.list.d/docker.sources"
+  call "echo \"Types: deb\" > $file"
+  call "echo \"URIs: https://download.docker.com/linux/ubuntu\" >> $file"
+  call "echo \"Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")\" >> $file"
+  call "echo \"Components: stable\" >> $file"
+  call "echo \"Architectures: $(dpkg --print-architecture)\" >> $file"
+  call "echo \"Signed-By: /etc/apt/keyrings/docker.asc\" >> $file"
 }
 
 
