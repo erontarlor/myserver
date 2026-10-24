@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# setup.sh V0.6
+# setup.sh V0.7
 #
 # Script for setting up a private web server with pre-configured NextCloud
 # service and automatically renewing Let's Encrypt SSL certificates, based
@@ -32,8 +32,11 @@ declare -a certificateCountry
 declare -a certificateState
 declare -a certificateCity
 declare -a certificateOrganization
+declare -a certificateUser
 declare -a certificateEMail
+declare -a certificatePublic
 certificateDomain[0]=localhost
+certificateUser[0]=${userName[0]}
 
 declare -i sshdPort=22
 
@@ -252,6 +255,12 @@ installTools()
 }
 
 
+installHugo()
+{
+  call "apt-get install hugo rsync -y"
+}
+
+
 addLetsEncryptRepository()
 {
   call "add-apt-repository universe -n -y"
@@ -319,28 +328,357 @@ configureApache()
 }
 
 
-createSslCertificate()
+createWebSite()
 {
-  echo "Creating SSL certificate for domain ${certificateDomain[$1]}..."
+  declare siteNo=$1
+  askValue "Enter domain name" "${certificateDomain[$siteNo]}"
+  certificateDomain[$siteNo]=$value
+  askValue "Enter country abbreviation" "${certificateCountry[$siteNo]}"
+  certificateCountry[$siteNo]=$value
+  askValue "Enter state" "${certificateState[$siteNo]}"
+  certificateState[$siteNo]=$value
+  askValue "Enter city" "${certificateCity[$siteNo]}"
+  certificateCity[$siteNo]=$value
+  askValue "Enter organization" "${certificateOrganization[$siteNo]}"
+  certificateOrganization[$siteNo]=$value
+  askValue "Enter NextCloud user responsible for the web site" "${certificateUser[$siteNo]}"
+  certificateUser[$siteNo]=$value
+  askValue "Enter e-mail" "${certificateEMail[$siteNo]}"
+  certificateEMail[$siteNo]=$value
+  askValue "Enter 0 if this site is private or 1 if it is public" "${certificatePublic[$siteNo]}"
+  certificatePublic[$siteNo]=$value
+  declare serverName=${certificateDomain[$siteNo]}
+  declare rootDir=/var/www/html/$serverName
+  call "mkdir -p $rootDir"
+  declare file=/etc/apache2/sites-available/$serverName.conf
+  createWebSiteConfig $file $serverName ${certificateUser[$siteNo]} ${certificateEMail[$siteNo]} $rootDir $siteNo ${certificatePublic[$siteNo]}
+  createLink $file /etc/apache2/sites-enabled/$serverName.conf
+  runCertbotIfNecessary $siteNo
+}
+
+
+createWebSiteConfig()
+{
+  declare file=$1
+  declare serverName=$2
+  declare user=$3
+  declare eMailAddress=$4
+  declare rootDir=$5
+  declare siteNo=$6
+  declare publicSite=$7
+  call "echo \"<IfModule mod_ssl.c>\" > $file"
   if [ "$testCertificates" = 1 ]
   then
-    call "openssl genrsa -out ${certificateDomain[$1]}.key 2048"
-    call "openssl req -new -subj \"/C=${certificateCountry[$1]}/ST=${certificateState[$1]}/L=${certificateCity[$1]}/O=${certificateOrganization[$1]}/OU=none/CN=${certificateDomain[$1]}/Email=${certificateEMail[$1]}\" -key ${certificateDomain[$1]}.key -out ${certificateDomain[$1]}.pem"
-    call "cp ${certificateDomain[$1]}.key ${certificateDomain[$1]}.key.org"
-    call "cp ${certificateDomain[$1]}.pem ${certificateDomain[$1]}.pem.org"
-    call "openssl rsa -in ${certificateDomain[$1]}.key.org -out ${certificateDomain[$1]}.key"
-    call "openssl x509 -req -days 365 -in ${certificateDomain[$1]}.pem.org -signkey ${certificateDomain[$1]}.key -out ${certificateDomain[$1]}.pem"
-    call "rm ${certificateDomain[$1]}.key.org ${certificateDomain[$1]}.pem.org"
-    call "mv ${certificateDomain[$1]}.pem /etc/ssl/certs"
-    call "mv ${certificateDomain[$1]}.key /etc/ssl/private"
-    call "chown root:root /etc/ssl/certs/${certificateDomain[$1]}.pem"
-    call "chmod 644 /etc/ssl/certs/${certificateDomain[$1]}.pem"
-    call "chown root:ssl-cert /etc/ssl/private/${certificateDomain[$1]}.key"
-    call "chmod 640 /etc/ssl/private/${certificateDomain[$1]}.key"
+    call "echo \"<VirtualHost *:443>\" >> $file"
+    addSiteDataToConfig $file $serverName $user $eMailAddress $rootDir $siteNo
+    createTestCertificate $siteNo
+    addCertificateToConfig $file $serverName
   else
-    #call "certbot --apache --test-cert --agree-tos -n -d ${certificateDomain[$1]} -m ${certificateEMail[$1]}"
-    call "certbot --apache --agree-tos -n -d ${certificateDomain[$1]} -m ${certificateEMail[$1]}"
+    call "echo \"<VirtualHost *:80>\" >> $file"
+    addSiteDataToConfig $file $serverName $user $eMailAddress $rootDir $siteNo
   fi
+  call "echo \"<IfModule mod_headers.c>\" >> $file"
+  if [ "$publicSite" = 1 ]
+  then
+    addPublicSiteHeader $file
+  fi
+  call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubDomains; preload\\\"\" >> $file"
+  call "echo \"</IfModule>\" >> $file"
+  call "echo \"</VirtualHost>\" >> $file"
+  call "echo \"</IfModule>\" >> $file"
+}
+
+
+addSiteDataToConfig()
+{
+  declare file=$1
+  declare serverName=$2
+  declare user=$3
+  declare eMailAddress=$4
+  declare rootDir=$5
+  declare siteNo=$6
+  call "echo \"ServerName $serverName\" >> $file"
+  #call "echo \"ServerAlias www.$serverName\" >> $file"
+  call "echo \"ServerAdmin $eMailAddress\" >> $file"
+  call "echo \"DocumentRoot $rootDir\" >> $file"
+  call "echo 'ErrorLog \${APACHE_LOG_DIR}/$serverName-error.log' >> $file"
+  call "echo 'CustomLog \${APACHE_LOG_DIR}/$serverName-access.log combined' >> $file"
+  # Possible values include: debug, info, notice, warn, error, crit, alert, emerg.
+  call "echo \"LogLevel warn\" >> $file"
+  if [ "$siteNo" = 0 ]
+  then
+    addProxyPassToConfig $file http://localhost:8080
+  else
+    call "echo \"ErrorDocument 404 /404.html\" >> $file"
+    addContentDirectoryToConfig $file $rootDir
+    configureHugo $serverName $user $rootDir
+  fi
+}
+
+
+addProxyPassToConfig()
+{
+  declare file=$1
+  declare url=$2
+  call "echo \"ProxyPass / $url/\" >> $file"
+  call "echo \"ProxyPassReverse / $url/\" >> $file"
+}
+
+
+addContentDirectoryToConfig()
+{
+  declare file=$1
+  declare rootDir=$2
+  call "echo \"<Directory $rootDir>\" >> $file"
+  call "echo \"  Options -Indexes -ExecCGI\" >> $file"
+  call "echo \"  AllowOverride None\" >> $file"
+  call "echo \"  Require all granted\" >> $file"
+  call "echo \"</Directory>\" >> $file"
+}
+
+
+configureHugo()
+{
+  declare serverName=$1
+  declare user=$2
+  declare rootDir=$3
+  createHugoBuildScript $serverName "/var/lib/docker/volumes/nextcloud_nextcloud/_data/data/$user/files/Websites/$serverName" $rootDir
+  createHugoService $serverName
+  createHugoTimer $serverName
+}
+
+
+createHugoBuildScript()
+{
+  declare serverName=$1
+  declare srcDir=$2
+  declare rootDir=$3
+  declare file=/etc/apache2/sites-available/$serverName-hugo.sh
+  call "echo '#!/usr/bin/env bash' > $file"
+  call "echo 'set -Eeuo pipefail' >> $file"
+  call "echo 'if [[ ! -d $srcDir ]]' >> $file"
+  call "echo 'then' >> $file"
+  call "echo '  echo \"No source files found for web site $serverName - nothing to be done.\"' >> $file"
+  call "echo '  exit 0' >> $file"
+  call "echo 'fi' >> $file"
+  call "echo 'echo \"Checking if web site $serverName needs to be released...\"' >> $file"
+  call "echo 'declare changedFiles=\$(find -L \"$srcDir\" -newer \"$rootDir\")' >> $file"
+  call "echo 'if [[ \$changedFiles == \"\" ]]' >> $file"
+  call "echo 'then' >> $file"
+  call "echo '  echo \"Nothing has changed - no release necessary.\"' >> $file"
+  call "echo '  exit 0' >> $file"
+  call "echo 'fi' >> $file"
+  call "echo 'echo \"Files changed:\"' >> $file"
+  call "echo 'echo \"\$changedFiles\"' >> $file"
+  call "echo 'sleep 3' >> $file"
+  call "echo 'echo \"Deleting old temporary directory...\"' >> $file"
+  call "echo 'if [[ -f \"$rootDir-new\" ]]' >> $file"
+  call "echo 'then' >> $file"
+  call "echo '  rm -rf \"$rootDir-new\"' >> $file"
+  call "echo 'fi' >> $file"
+  call "echo 'echo \"Creating new temporary directory...\"' >> $file"
+  call "echo 'mkdir -p \"$rootDir-new\"' >> $file"
+  call "echo 'echo \"Running Hugo to create web site...\"' >> $file"
+  call "echo 'hugo --source \"$srcDir\" --destination \"$rootDir-new\" --cleanDestinationDir' >> $file"
+  call "echo 'test -s \"$rootDir-new/index.html\"' >> $file"
+  call "echo 'echo \"Saving currently released directory...\"' >> $file"
+  call "echo 'mv \"$rootDir\" \"$rootDir-old\"' >> $file"
+  call "echo 'echo \"Releasing new directory...\"' >> $file"
+  call "echo 'if mv \"$rootDir-new\" \"$rootDir\"' >> $file"
+  call "echo 'then' >> $file"
+  call "echo '  echo \"Deleting old directory...\"' >> $file"
+  call "echo '  rm -rf \"$rootDir-old\"' >> $file"
+  call "echo '  echo \"Done.\"' >> $file"
+  call "echo 'else' >> $file"
+  call "echo '  echo \"Error releasing new directory - restoring old one...\"' >> $file"
+  call "echo '  mv \"$rootDir-old\" \"$rootDir\"' >> $file"
+  call "echo 'fi' >> $file"
+  call "chmod a+x $file"
+}
+
+
+createHugoService()
+{
+  declare serverName=$1
+  declare file=/etc/systemd/system/$serverName-hugo.service
+  call "echo '[Unit]' > $file"
+  call "echo 'Description=Build web site for $serverName with Hugo' >> $file"
+  call "echo '[Service]' >> $file"
+  call "echo 'Type=oneshot' >> $file"
+  call "echo 'User=root' >> $file"
+  call "echo 'Group=www-data' >> $file"
+  call "echo 'ExecStart=/etc/apache2/sites-available/$serverName-hugo.sh' >> $file"
+}
+
+
+createHugoTimer()
+{
+  declare serverName=$1
+  declare file=/etc/systemd/system/$serverName-hugo.timer
+  call "echo '[Unit]' > $file"
+  call "echo 'Description=Run web site build for $serverName periodically' >> $file"
+  call "echo '[Timer]' >> $file"
+  call "echo 'OnBootSec=5min' >> $file"
+  call "echo 'OnUnitActiveSec=1min' >> $file"
+  call "echo 'Unit=$serverName-hugo.service' >> $file"
+  call "echo '[Install]' >> $file"
+  call "echo 'WantedBy=timers.target' >> $file"
+}
+
+
+createTestCertificate()
+{
+  declare siteNo=$1
+  echo "Creating test SSL certificate for domain ${certificateDomain[$siteNo]}..."
+  call "openssl genrsa -out ${certificateDomain[$siteNo]}.key 2048"
+  call "openssl req -new -subj \"/C=${certificateCountry[$siteNo]}/ST=${certificateState[$siteNo]}/L=${certificateCity[$siteNo]}/O=${certificateOrganization[$siteNo]}/OU=none/CN=${certificateDomain[$siteNo]}/Email=${certificateEMail[$siteNo]}\" -key ${certificateDomain[$siteNo]}.key -out ${certificateDomain[$siteNo]}.pem"
+  call "cp ${certificateDomain[$siteNo]}.key ${certificateDomain[$siteNo]}.key.org"
+  call "cp ${certificateDomain[$siteNo]}.pem ${certificateDomain[$siteNo]}.pem.org"
+  call "openssl rsa -in ${certificateDomain[$siteNo]}.key.org -out ${certificateDomain[$siteNo]}.key"
+  call "openssl x509 -req -days 365 -in ${certificateDomain[$siteNo]}.pem.org -signkey ${certificateDomain[$siteNo]}.key -out ${certificateDomain[$siteNo]}.pem"
+  call "rm ${certificateDomain[$siteNo]}.key.org ${certificateDomain[$siteNo]}.pem.org"
+  call "mv ${certificateDomain[$siteNo]}.pem /etc/ssl/certs"
+  call "mv ${certificateDomain[$siteNo]}.key /etc/ssl/private"
+  call "chown root:root /etc/ssl/certs/${certificateDomain[$siteNo]}.pem"
+  call "chmod 644 /etc/ssl/certs/${certificateDomain[$siteNo]}.pem"
+  call "chown root:ssl-cert /etc/ssl/private/${certificateDomain[$siteNo]}.key"
+  call "chmod 640 /etc/ssl/private/${certificateDomain[$siteNo]}.key"
+}
+
+
+addCertificateToConfig()
+{
+  declare file=$1
+  declare serverName=$2
+  #   SSL Engine Switch:
+  #   Enable/Disable SSL for this virtual host.
+  #SSLEngine on
+  #   A self-signed (snakeoil) certificate can be created by installing
+  #   the ssl-cert package. See
+  #   /usr/share/doc/apache2.2-common/README.Debian.gz for more info.
+  #   If both key and certificate are stored in the same file, only the
+  #   SSLCertificateFile directive is needed.
+  call "echo \"SSLCertificateFile    /etc/ssl/certs/$serverName.pem\" >> $file"
+  call "echo \"SSLCertificateKeyFile /etc/ssl/private/$serverName.key\" >> $file"
+  #   Server Certificate Chain:
+  #   Point SSLCertificateChainFile at a file containing the
+  #   concatenation of PEM encoded CA certificates which form the
+  #   certificate chain for the server certificate. Alternatively
+  #   the referenced file can be the same as SSLCertificateFile
+  #   when the CA certificates are directly appended to the server
+  #   certificate for convinience.
+  call "echo \"SSLCertificateChainFile /etc/ssl/certs/$serverName.pem\" >> $file"
+  #   Certificate Authority (CA):
+  #   Set the CA certificate verification path where to find CA
+  #   certificates for client authentication or alternatively one
+  #   huge file containing all of them (file must be PEM encoded)
+  #   Note: Inside SSLCACertificatePath you need hash symlinks
+  #         to point to the certificate files. Use the provided
+  #         Makefile to update the hash symlinks after changes.
+  #SSLCACertificatePath /etc/ssl/certs/
+  #SSLCACertificateFile /etc/apache2/ssl.crt/ca-bundle.crt
+  #   Certificate Revocation Lists (CRL):
+  #   Set the CA revocation path where to find CA CRLs for client
+  #   authentication or alternatively one huge file containing all
+  #   of them (file must be PEM encoded)
+  #   Note: Inside SSLCARevocationPath you need hash symlinks
+  #         to point to the certificate files. Use the provided
+  #         Makefile to update the hash symlinks after changes.
+  #SSLCARevocationPath /etc/apache2/ssl.crl/
+  #SSLCARevocationFile /etc/apache2/ssl.crl/ca-bundle.crl
+  #   Client Authentication (Type):
+  #   Client certificate verification type and depth.  Types are
+  #   none, optional, require and optional_no_ca.  Depth is a
+  #   number which specifies how deeply to verify the certificate
+  #   issuer chain before deciding the certificate is not valid.
+  #SSLVerifyClient require
+  #SSLVerifyDepth  10
+  #   Access Control:
+  #   With SSLRequire you can do per-directory access control based
+  #   on arbitrary complex boolean expressions containing server
+  #   variable checks and other lookup directives.  The syntax is a
+  #   mixture between C and Perl.  See the mod_ssl documentation
+  #   for more details.
+  #<Location />
+  #SSLRequire (    %{SSL_CIPHER} !~ m/^(EXP|NULL)/ \
+  #            and %{SSL_CLIENT_S_DN_O} eq "Snake Oil, Ltd." \
+  #            and %{SSL_CLIENT_S_DN_OU} in {"Staff", "CA", "Dev"} \
+  #            and %{TIME_WDAY} >= 1 and %{TIME_WDAY} <= 5 \
+  #            and %{TIME_HOUR} >= 8 and %{TIME_HOUR} <= 20       ) \
+  #           or %{REMOTE_ADDR} =~ m/^192\.76\.162\.[0-9]+$/
+  #</Location>
+  #   SSL Engine Options:
+  #   Set various options for the SSL engine.
+  #   o FakeBasicAuth:
+  #     Translate the client X.509 into a Basic Authorisation.  This means that
+  #     the standard Auth/DBMAuth methods can be used for access control.  The
+  #     user name is the `one line' version of the client's X.509 certificate.
+  #     Note that no password is obtained from the user. Every entry in the user
+  #     file needs this password: `xxj31ZMTZzkVA'.
+  #   o ExportCertData:
+  #     This exports two additional environment variables: SSL_CLIENT_CERT and
+  #     SSL_SERVER_CERT. These contain the PEM-encoded certificates of the
+  #     server (always existing) and the client (only existing when client
+  #     authentication is used). This can be used to import the certificates
+  #     into CGI scripts.
+  #   o StdEnvVars:
+  #     This exports the standard SSL/TLS related `SSL_*' environment variables.
+  #     Per default this exportation is switched off for performance reasons,
+  #     because the extraction step is an expensive operation and is usually
+  #     useless for serving static content. So one usually enables the
+  #     exportation for CGI and SSI requests only.
+  #   o StrictRequire:
+  #     This denies access when "SSLRequireSSL" or "SSLRequire" applied even
+  #     under a "Satisfy any" situation, i.e. when it applies access is denied
+  #     and no other module can change it.
+  #   o OptRenegotiate:
+  #     This enables optimized SSL connection renegotiation handling when SSL
+  #     directives are used in per-directory context.
+  #SSLOptions +FakeBasicAuth +ExportCertData +StrictRequire
+  call "echo \"<FilesMatch \\\"\\\\.(cgi|shtml|phtml|php)$\\\">\" >> $file"
+  call "echo \"SSLOptions +StdEnvVars\" >> $file"
+  call "echo \"</FilesMatch>\" >> $file"
+  call "echo \"<Directory /usr/lib/cgi-bin>\" >> $file"
+  call "echo \"SSLOptions +StdEnvVars\" >> $file"
+  call "echo \"</Directory>\" >> $file"
+  #   SSL Protocol Adjustments:
+  #   The safe and default but still SSL/TLS standard compliant shutdown
+  #   approach is that mod_ssl sends the close notify alert but doesn't wait for
+  #   the close notify alert from client. When you need a different shutdown
+  #   approach you can use one of the following variables:
+  #   o ssl-unclean-shutdown:
+  #     This forces an unclean shutdown when the connection is closed, i.e. no
+  #     SSL close notify alert is send or allowed to received.  This violates
+  #     the SSL/TLS standard but is needed for some brain-dead browsers. Use
+  #     this when you receive I/O errors because of the standard approach where
+  #     mod_ssl sends the close notify alert.
+  #   o ssl-accurate-shutdown:
+  #     This forces an accurate shutdown when the connection is closed, i.e. a
+  #     SSL close notify alert is send and mod_ssl waits for the close notify
+  #     alert of the client. This is 100% SSL/TLS standard compliant, but in
+  #     practice often causes hanging connections with brain-dead browsers. Use
+  #     this only for browsers where you know that their SSL implementation
+  #     works correctly.
+  #   Notice: Most problems of broken clients are also related to the HTTP
+  #   keep-alive facility, so you usually additionally want to disable
+  #   keep-alive for those clients, too. Use variable "nokeepalive" for this.
+  #   Similarly, one has to force some clients to use HTTP/1.0 to workaround
+  #   their broken HTTP/1.1 implementation. Use variables "downgrade-1.0" and
+  #   "force-response-1.0" for this.
+  call "echo \"BrowserMatch \\\"MSIE [2-6]\\\" \\\\\" >> $file"
+  call "echo \"nokeepalive ssl-unclean-shutdown \\\\\" >> $file"
+  call "echo \"downgrade-1.0 force-response-1.0\" >> $file"
+  # MSIE 7 and newer should be able to use keepalive\" >> $file"
+  call "echo \"BrowserMatch \\\"MSIE [17-9]\\\" ssl-unclean-shutdown\" >> $file"
+}
+
+
+addPublicSiteHeader()
+{
+  declare file=$1
+  call "echo \"Header unset X-Robots-Tag\" >> $file"
+  call "echo \"Header unset Pragma\" >> $file"
+  call "echo \"Header set Cache-Control \\\"public, must-revalidate\\\"\" >> $file"
 }
 
 
@@ -353,354 +691,153 @@ createLink()
 }
 
 
-createWebSite()
+runCertbotIfNecessary()
 {
-  askValue "Enter domain name" "${certificateDomain[$1]}"
-  certificateDomain[$1]=$value
-  askValue "Enter country abbreviation" "${certificateCountry[$1]}"
-  certificateCountry[$1]=$value
-  askValue "Enter state" "${certificateState[$1]}"
-  certificateState[$1]=$value
-  askValue "Enter city" "${certificateCity[$1]}"
-  certificateCity[$1]=$value
-  askValue "Enter organization" "${certificateOrganization[$1]}"
-  certificateOrganization[$1]=$value
-  askValue "Enter e-mail" "${certificateEMail[$1]}"
-  certificateEMail[$1]=$value
-  declare id=$(printf '%3.3d' $1)
-  declare serverName=${certificateDomain[$1]}
-  declare file="/etc/apache2/sites-available/$id-$serverName.conf"
-  call "echo \"<IfModule mod_ssl.c>\" > $file"
-  if [ "$testCertificates" = 1 ]
+  declare siteNo=$1
+  if [ "$testCertificates" = 0 ]
   then
-    call "echo \"<VirtualHost *:443>\" >> $file"
-  else
-    call "echo \"<VirtualHost *:80>\" >> $file"
-    call "echo \"DocumentRoot /var/www/html\" >> $file"
+    echo "Running Let's Encrypt certbot for domain ${certificateDomain[$siteNo]}..."
+    #call "certbot --apache --test-cert --agree-tos -n -d ${certificateDomain[$siteNo]} -m ${certificateEMail[$siteNo]}"
+    call "certbot --apache --agree-tos -n -d ${certificateDomain[$siteNo]} -m ${certificateEMail[$siteNo]}"
   fi
-  call "echo \"ServerName $serverName\" >> $file"
-  #call "echo \"ServerAlias www.$serverName\" >> $file"
-  call "echo \"ServerAdmin ${certificateEMail[$1]}\" >> $file"
-  
-  if [ "$serverName" == "nextcloud.gaudiversum.de" ]
-  then
-    call "echo \"ProxyPass /sites/ http://localhost:8080//index.php/apps/cms_pico/pico/\" >> $file"
-    call "echo \"ProxyPassReverse /sites/ http://localhost:8080//index.php/apps/cms_pico/pico/\" >> $file"
-    call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
-    call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
-  elif [ "$serverName" == "www.gaudiumludendi.de" ]
-  then
-    call "echo \"ProxyPass /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/gaudiumludendi/assets/robots.txt\" >> $file"
-    call "echo \"ProxyPassReverse /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/gaudiumludendi/assets/robots.txt\" >> $file"
-    call "echo \"ProxyPass /index.php/ http://localhost:8080/index.php/\" >> $file"
-    call "echo \"ProxyPassReverse /index.php/ http://localhost:8080/index.php/\" >> $file"
-    call "echo \"ProxyPass /custom/ http://localhost:8080/custom/\" >> $file"
-    call "echo \"ProxyPassReverse /custom/ http://localhost:8080/custom/\" >> $file"
-    call "echo \"ProxyPass /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
-    call "echo \"ProxyPassReverse /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
-    call "echo \"ProxyPass /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
-    call "echo \"ProxyPassReverse /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
-    call "echo \"ProxyPass / http://localhost:8080//index.php/apps/cms_pico/pico/gaudiumludendi/\" >> $file"
-    call "echo \"ProxyPassReverse / http://localhost:8080//index.php/apps/cms_pico/pico/gaudiumludendi\" >> $file"
-  elif [ "$serverName" == "seifenoper.gaudiversum.de" ]
-  then
-    call "echo \"ProxyPass /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/soapopera/assets/robots.txt\" >> $file"
-    call "echo \"ProxyPassReverse /robots.txt http://localhost:8080/index.php/apps/cms_pico/pico/soapopera/assets/robots.txt\" >> $file"
-    call "echo \"ProxyPass /index.php/ http://localhost:8080/index.php/\" >> $file"
-    call "echo \"ProxyPassReverse /index.php/ http://localhost:8080/index.php/\" >> $file"
-    call "echo \"ProxyPass /custom/ http://localhost:8080/custom/\" >> $file"
-    call "echo \"ProxyPassReverse /custom/ http://localhost:8080/custom/\" >> $file"
-    call "echo \"ProxyPass /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
-    call "echo \"ProxyPassReverse /custom_apps/ http://localhost:8080/custom_apps/\" >> $file"
-    call "echo \"ProxyPass /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
-    call "echo \"ProxyPassReverse /sites/ http://localhost:8080/index.php/apps/cms_pico/pico/\" >> $file"
-    call "echo \"ProxyPass / http://localhost:8080//index.php/apps/cms_pico/pico/soapopera/\" >> $file"
-    call "echo \"ProxyPassReverse / http://localhost:8080//index.php/apps/cms_pico/pico/soapopera\" >> $file"
-  elif [ "$serverName" == "gallery.gaudiversum.de" ]
-  then
-    call "echo \"ProxyPass /froschteich http://localhost:8080/apps/gallery/s/nzWzBHHMdwQCfa9\" >> $file"
-    call "echo \"ProxyPassReverse /froschteich http://localhost:8080/apps/gallery/s/nzWzBHHMdwQCfa9\" >> $file"
-    call "echo \"ProxyPass /tkd http://localhost:8080/apps/gallery/s/67EiDLHLhUHuJ2R\" >> $file"
-    call "echo \"ProxyPassReverse /tkd http://localhost:8080/apps/gallery/s/67EiDLHLhUHuJ2R\" >> $file"
-    call "echo \"ProxyPass /aufbaukurs http://localhost:8080/apps/gallery/s/QBo0TpxiRp0QLuf\" >> $file"
-    call "echo \"ProxyPassReverse /aufbaukurs http://localhost:8080/apps/gallery/s/QBo0TpxiRp0QLuf\" >> $file"
-    call "echo \"ProxyPass /tanzen http://localhost:8080/s/d6W83ahgNJ1lJj8\" >> $file"
-    call "echo \"ProxyPassReverse /tanzen http://localhost:8080/s/d6W83ahgNJ1lJj8\" >> $file"
-    call "echo \"ProxyPass /stopmotion http://localhost:8080/s/9EpfG54Is6lq22J\" >> $file"
-    call "echo \"ProxyPassReverse /stopmotion http://localhost:8080/s/9EpfG54Is6lq22J\" >> $file"
-    call "echo \"ProxyPass /warriorsparty http://localhost:8080/s/1cSky3hYafYGXUG\" >> $file"
-    call "echo \"ProxyPassReverse /warriorsparty http://localhost:8080/s/1cSky3hYafYGXUG\" >> $file"
-    call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
-    call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
-  elif [ "$serverName" == "sites.gaudiversum.de" ]
-  then
-    call "echo \"<Directory /var/www/html>\" >> $file"
-    call "echo \"Options +FollowSymLinks\" >> $file"
-    call "echo \"AllowOverride None\" >> $file"
-    call "echo \"Require all granted\" >> $file"
-    call "echo \"</Directory>\" >> $file"
-    call "mv /var/www/html /var/www/html.orig"
-    createLink "/var/lib/docker/volumes/nextcloud_nextcloud/_data/data/carlos/files/Websites/html" "/var/www/html"
-  else
-    call "echo \"ProxyPass / http://localhost:8080/\" >> $file"
-    call "echo \"ProxyPassReverse / http://localhost:8080/\" >> $file"
-  fi
-  
-  call "echo 'ErrorLog \${APACHE_LOG_DIR}/error.log' >> $file"
-  call "echo 'CustomLog \${APACHE_LOG_DIR}/ssl_access.log combined' >> $file"
-  # Possible values include: debug, info, notice, warn, error, crit,
-  # alert, emerg.
-  call "echo \"LogLevel warn\" >> $file"
-
-  if [ "$testCertificates" = 1 ]
-  then
-    #   SSL Engine Switch:
-    #   Enable/Disable SSL for this virtual host.
-    #SSLEngine on
-    #   A self-signed (snakeoil) certificate can be created by installing
-    #   the ssl-cert package. See
-    #   /usr/share/doc/apache2.2-common/README.Debian.gz for more info.
-    #   If both key and certificate are stored in the same file, only the
-    #   SSLCertificateFile directive is needed.
-    call "echo \"SSLCertificateFile    /etc/ssl/certs/$serverName.pem\" >> $file"
-    call "echo \"SSLCertificateKeyFile /etc/ssl/private/$serverName.key\" >> $file"
-    #   Server Certificate Chain:
-    #   Point SSLCertificateChainFile at a file containing the
-    #   concatenation of PEM encoded CA certificates which form the
-    #   certificate chain for the server certificate. Alternatively
-    #   the referenced file can be the same as SSLCertificateFile
-    #   when the CA certificates are directly appended to the server
-    #   certificate for convinience.
-    call "echo \"SSLCertificateChainFile /etc/ssl/certs/$serverName.pem\" >> $file"
-    #   Certificate Authority (CA):
-    #   Set the CA certificate verification path where to find CA
-    #   certificates for client authentication or alternatively one
-    #   huge file containing all of them (file must be PEM encoded)
-    #   Note: Inside SSLCACertificatePath you need hash symlinks
-    #         to point to the certificate files. Use the provided
-    #         Makefile to update the hash symlinks after changes.
-    #SSLCACertificatePath /etc/ssl/certs/
-    #SSLCACertificateFile /etc/apache2/ssl.crt/ca-bundle.crt
-    #   Certificate Revocation Lists (CRL):
-    #   Set the CA revocation path where to find CA CRLs for client
-    #   authentication or alternatively one huge file containing all
-    #   of them (file must be PEM encoded)
-    #   Note: Inside SSLCARevocationPath you need hash symlinks
-    #         to point to the certificate files. Use the provided
-    #         Makefile to update the hash symlinks after changes.
-    #SSLCARevocationPath /etc/apache2/ssl.crl/
-    #SSLCARevocationFile /etc/apache2/ssl.crl/ca-bundle.crl
-    #   Client Authentication (Type):
-    #   Client certificate verification type and depth.  Types are
-    #   none, optional, require and optional_no_ca.  Depth is a
-    #   number which specifies how deeply to verify the certificate
-    #   issuer chain before deciding the certificate is not valid.
-    #SSLVerifyClient require
-    #SSLVerifyDepth  10
-    #   Access Control:
-    #   With SSLRequire you can do per-directory access control based
-    #   on arbitrary complex boolean expressions containing server
-    #   variable checks and other lookup directives.  The syntax is a
-    #   mixture between C and Perl.  See the mod_ssl documentation
-    #   for more details.
-    #<Location />
-    #SSLRequire (    %{SSL_CIPHER} !~ m/^(EXP|NULL)/ \
-    #            and %{SSL_CLIENT_S_DN_O} eq "Snake Oil, Ltd." \
-    #            and %{SSL_CLIENT_S_DN_OU} in {"Staff", "CA", "Dev"} \
-    #            and %{TIME_WDAY} >= 1 and %{TIME_WDAY} <= 5 \
-    #            and %{TIME_HOUR} >= 8 and %{TIME_HOUR} <= 20       ) \
-    #           or %{REMOTE_ADDR} =~ m/^192\.76\.162\.[0-9]+$/
-    #</Location>
-    #   SSL Engine Options:
-    #   Set various options for the SSL engine.
-    #   o FakeBasicAuth:
-    #     Translate the client X.509 into a Basic Authorisation.  This means that
-    #     the standard Auth/DBMAuth methods can be used for access control.  The
-    #     user name is the `one line' version of the client's X.509 certificate.
-    #     Note that no password is obtained from the user. Every entry in the user
-    #     file needs this password: `xxj31ZMTZzkVA'.
-    #   o ExportCertData:
-    #     This exports two additional environment variables: SSL_CLIENT_CERT and
-    #     SSL_SERVER_CERT. These contain the PEM-encoded certificates of the
-    #     server (always existing) and the client (only existing when client
-    #     authentication is used). This can be used to import the certificates
-    #     into CGI scripts.
-    #   o StdEnvVars:
-    #     This exports the standard SSL/TLS related `SSL_*' environment variables.
-    #     Per default this exportation is switched off for performance reasons,
-    #     because the extraction step is an expensive operation and is usually
-    #     useless for serving static content. So one usually enables the
-    #     exportation for CGI and SSI requests only.
-    #   o StrictRequire:
-    #     This denies access when "SSLRequireSSL" or "SSLRequire" applied even
-    #     under a "Satisfy any" situation, i.e. when it applies access is denied
-    #     and no other module can change it.
-    #   o OptRenegotiate:
-    #     This enables optimized SSL connection renegotiation handling when SSL
-    #     directives are used in per-directory context.
-    #SSLOptions +FakeBasicAuth +ExportCertData +StrictRequire
-    call "echo \"<FilesMatch \\\"\\\\.(cgi|shtml|phtml|php)$\\\">\" >> $file"
-    call "echo \"SSLOptions +StdEnvVars\" >> $file"
-    call "echo \"</FilesMatch>\" >> $file"
-    call "echo \"<Directory /usr/lib/cgi-bin>\" >> $file"
-    call "echo \"SSLOptions +StdEnvVars\" >> $file"
-    call "echo \"</Directory>\" >> $file"
-    #   SSL Protocol Adjustments:
-    #   The safe and default but still SSL/TLS standard compliant shutdown
-    #   approach is that mod_ssl sends the close notify alert but doesn't wait for
-    #   the close notify alert from client. When you need a different shutdown
-    #   approach you can use one of the following variables:
-    #   o ssl-unclean-shutdown:
-    #     This forces an unclean shutdown when the connection is closed, i.e. no
-    #     SSL close notify alert is send or allowed to received.  This violates
-    #     the SSL/TLS standard but is needed for some brain-dead browsers. Use
-    #     this when you receive I/O errors because of the standard approach where
-    #     mod_ssl sends the close notify alert.
-    #   o ssl-accurate-shutdown:
-    #     This forces an accurate shutdown when the connection is closed, i.e. a
-    #     SSL close notify alert is send and mod_ssl waits for the close notify
-    #     alert of the client. This is 100% SSL/TLS standard compliant, but in
-    #     practice often causes hanging connections with brain-dead browsers. Use
-    #     this only for browsers where you know that their SSL implementation
-    #     works correctly.
-    #   Notice: Most problems of broken clients are also related to the HTTP
-    #   keep-alive facility, so you usually additionally want to disable
-    #   keep-alive for those clients, too. Use variable "nokeepalive" for this.
-    #   Similarly, one has to force some clients to use HTTP/1.0 to workaround
-    #   their broken HTTP/1.1 implementation. Use variables "downgrade-1.0" and
-    #   "force-response-1.0" for this.
-    call "echo \"BrowserMatch \\\"MSIE [2-6]\\\" \\\\\" >> $file"
-    call "echo \"nokeepalive ssl-unclean-shutdown \\\\\" >> $file"
-    call "echo \"downgrade-1.0 force-response-1.0\" >> $file"
-    # MSIE 7 and newer should be able to use keepalive\" >> $file"
-    call "echo \"BrowserMatch \\\"MSIE [17-9]\\\" ssl-unclean-shutdown\" >> $file"
-  fi
-  call "echo \"<IfModule mod_headers.c>\" >> $file"
-  if [ "$serverName" == "www.gaudiumludendi.de" ]
-  then
-    call "echo \"Header unset X-Robots-Tag\" >> $file"
-    call "echo \"Header unset Pragma\" >> $file"
-    call "echo \"Header set Cache-Control \\\"public, must-revalidate\\\"\" >> $file"
-  fi
-  call "echo \"Header always set Strict-Transport-Security \\\"max-age=15552000; includeSubDomains; preload\\\"\" >> $file"
-  call "echo \"</IfModule>\" >> $file"
-  call "echo \"</VirtualHost>\" >> $file"
-  call "echo \"</IfModule>\" >> $file"
-  createLink "$file" "/etc/apache2/sites-enabled/$id-$serverName.conf"
-  createSslCertificate $1
-}
-
-
-declare passwordSha1
-calculatePasswordSha1()
-{
-  declare array
-  call "array=(\$( echo -n \"$1\" | sha1sum ))"
-  passwordSha1=${array[0]}
 }
 
 
 installNextCloud()
 {
-  askPassword "Enter NextCloud admin password" $nextCloudPassword
+  askPassword "Enter NextCloud admin password" "$nextCloudPassword"
   nextCloudPassword=$password
   if [ ! -d nextcloud ]
   then
     call "mkdir nextcloud"
   fi
   call "cd nextcloud"
-  declare compose="docker-compose.yml"
-  call "echo \"version: '2'\" > $compose"
-  call "echo \"\" >> $compose"
-  call "echo \"volumes:\" >> $compose"
-  call "echo \"  nextcloud:\" >> $compose"
-  call "echo \"    driver: local\" >> $compose"
-  call "echo \"  db:\" >> $compose"
-  call "echo \"    driver: local\" >> $compose"
-  call "echo \"  backup:\" >> $compose"
-  call "echo \"    driver: local\" >> $compose"
-  call "echo \"  redis:\" >> $compose"
-  call "echo \"    driver: local\" >> $compose"
-  call "echo \"\" >> $compose"
-  call "echo \"services:\" >> $compose"
-  call "echo \"  nextcloud:\" >> $compose"
-  call "echo \"    image: nextcloud\" >> $compose"
-  call "echo \"    restart: always\" >> $compose"
-  call "echo \"    ports:\" >> $compose"
-  call "echo \"      - 8080:80\" >> $compose"
-  call "echo \"    links:\" >> $compose"
-  call "echo \"      - db\" >> $compose"
-  call "echo \"      - redis\" >> $compose"
-  call "echo \"    environment:\" >> $compose"
-  call "echo \"      - MYSQL_DATABASE=nextcloud\" >> $compose"
-  call "echo \"      - MYSQL_PASSWORD=nextcloud\" >> $compose"
-  call "echo \"      - MYSQL_USER=nextcloud\" >> $compose"
-  call "echo \"      - MYSQL_HOST=db\" >> $compose"
-  call "echo \"      - NEXTCLOUD_ADMIN_USER=admin\" >> $compose"
-  call "echo \"      - NEXTCLOUD_ADMIN_PASSWORD=$nextCloudPassword\" >> $compose"
-  call "echo \"      - NEXTCLOUD_DOMAIN=localhost\" >> $compose"
-  call "echo \"      - OVERWRITEHOST=${certificateDomain[0]}\" >> $compose"
-  call "echo \"      - OVERWRITEPROTOCOL=https\" >> $compose"
-  call "echo \"      - OVERWRITEWEBROOT=/\" >> $compose"
-  call "echo \"      - OVERWRITE_CLI_URL=https://${certificateDomain[0]}\" >> $compose"
-  call "echo \"      - HTACCESS_REWRITE_BASE=/\" >> $compose"
-  call "echo \"      - MYSQL_UTF8MB4=true\" >> $compose"
-  call "echo \"      - REDIS_HOST=redis\" >> $compose"
-  call "echo \"      - REDIS_HOST_PASSWORD=redis\" >> $compose"
-#  call "echo \"    healthcheck:\" >> $compose"
-#  call "echo \"      test: ['CMD', '/usr/bin/healthcheck']\" >> $compose"
-#  call "echo \"      interval: 30s\" >> $compose"
-#  call "echo \"      timeout: 10s\" >> $compose"
-#  call "echo \"      retries: 5\" >> $compose"
-  call "echo \"    volumes:\" >> $compose"
-  call "echo \"      - nextcloud:/var/www/html\" >> $compose"
-  call "echo \"\" >> $compose"
-  call "echo \"  db:\" >> $compose"
-  call "echo \"    image: mariadb\" >> $compose"
-  call "echo \"    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW\" >> $compose"
-  call "echo \"    restart: always\" >> $compose"
-  call "echo \"    environment:\" >> $compose"
-  call "echo \"      - MARIADB_MAX_ALLOWED_PACKET=128M\" >> $compose"
-  call "echo \"      - MARIADB_INNODB_LOG_FILE_SIZE=64M\" >> $compose"
-  call "echo \"      - MYSQL_ROOT_PASSWORD=nextcloud\" >> $compose"
-  call "echo \"      - MYSQL_PASSWORD=nextcloud\" >> $compose"
-  call "echo \"      - MYSQL_DATABASE=nextcloud\" >> $compose"
-  call "echo \"      - MYSQL_USER=nextcloud\" >> $compose"
-#  call "echo \"    healthcheck:\" >> $compose"
-#  call "echo \"      test: ['CMD', '/usr/bin/healthcheck']\" >> $compose"
-#  call "echo \"      interval: 30s\" >> $compose"
-#  call "echo \"      timeout: 10s\" >> $compose"
-#  call "echo \"      retries: 5\" >> $compose"
-  call "echo \"    volumes:\" >> $compose"
-  call "echo \"      - db:/var/lib/mysql\" >> $compose"
-  call "echo \"      - backup:/var/lib/backup\" >> $compose"
-  call "echo \"\" >> $compose"
-  call "echo \"  redis:\" >> $compose"
-  call "echo \"    image: redis\" >> $compose"
-  call "echo \"    command: --requirepass redis\" >> $compose"
-  call "echo \"    restart: always\" >> $compose"
-  call "echo \"    environment:\" >> $compose"
-  call "echo \"      - REDIS_DATABASES=1\" >> $compose"
-#  call "echo \"    healthcheck:\" >> $compose"
-#  call "echo \"      test: ['CMD', '/usr/bin/healthcheck']\" >> $compose"
-#  call "echo \"      interval: 30s\" >> $compose"
-#  call "echo \"      timeout: 10s\" >> $compose"
-#  call "echo \"      retries: 5\" >> $compose"
-  call "echo \"    volumes:\" >> $compose"
-  call "echo \"      - redis:/var/lib/redis\" >> $compose"
+  declare file=docker-compose.yml
+  createNextCloudDockerComposeYaml $file ${certificateDomain[0]} "$nextCloudPassword"
   call "docker-compose up -d"
-  sleep 30
-#  echo "Changing admin password..."
-#  call "docker-compose exec -u www-data nextcloud php occ maintenance:install || true"
-#  calculatePasswordSha1 "$nextCloudPassword"
-#  call "docker-compose exec nextcloud mysql -h db -pnextcloud -P 3306 -u nextcloud -D nextcloud -e \"update oc_users set password='$passwordSha1' where uid='admin';\""
-  echo "Installing additional apps..."
+  sleep 50
+  #changeNextCloudAdminPassword "$nextCloudPassword"
+  installAdditionalNextCloudApps
+  addingNextCloudUsers
+  restartNextCloud
+  call "cd .."
+}
+
+
+createNextCloudDockerComposeYaml()
+{
+  declare file=$1
+  declare domain=$2
+  declare nextCloudPassword=$3
+  echo "Creating NextCloud $file..."
+  call "echo \"version: '2'\" > $file"
+  call "echo \"\" >> $file"
+  call "echo \"volumes:\" >> $file"
+  call "echo \"  nextcloud:\" >> $file"
+  call "echo \"    driver: local\" >> $file"
+  call "echo \"  db:\" >> $file"
+  call "echo \"    driver: local\" >> $file"
+  call "echo \"  backup:\" >> $file"
+  call "echo \"    driver: local\" >> $file"
+  call "echo \"  redis:\" >> $file"
+  call "echo \"    driver: local\" >> $file"
+  call "echo \"\" >> $file"
+  call "echo \"services:\" >> $file"
+  call "echo \"  nextcloud:\" >> $file"
+  call "echo \"    image: nextcloud\" >> $file"
+  call "echo \"    restart: always\" >> $file"
+  call "echo \"    ports:\" >> $file"
+  call "echo \"      - 8080:80\" >> $file"
+  call "echo \"    links:\" >> $file"
+  call "echo \"      - db\" >> $file"
+  call "echo \"      - redis\" >> $file"
+  call "echo \"    environment:\" >> $file"
+  call "echo \"      - MYSQL_DATABASE=nextcloud\" >> $file"
+  call "echo \"      - MYSQL_PASSWORD=nextcloud\" >> $file"
+  call "echo \"      - MYSQL_USER=nextcloud\" >> $file"
+  call "echo \"      - MYSQL_HOST=db\" >> $file"
+  call "echo \"      - NEXTCLOUD_ADMIN_USER=admin\" >> $file"
+  call "echo \"      - NEXTCLOUD_ADMIN_PASSWORD=$nextCloudPassword\" >> $file"
+  call "echo \"      - NEXTCLOUD_DOMAIN=localhost\" >> $file"
+  call "echo \"      - OVERWRITEHOST=$domain\" >> $file"
+  call "echo \"      - OVERWRITEPROTOCOL=https\" >> $file"
+  call "echo \"      - OVERWRITEWEBROOT=/\" >> $file"
+  call "echo \"      - OVERWRITE_CLI_URL=https://$domain\" >> $file"
+  call "echo \"      - HTACCESS_REWRITE_BASE=/\" >> $file"
+  call "echo \"      - MYSQL_UTF8MB4=true\" >> $file"
+  call "echo \"      - REDIS_HOST=redis\" >> $file"
+  call "echo \"      - REDIS_HOST_PASSWORD=redis\" >> $file"
+#  call "echo \"    healthcheck:\" >> $file"
+#  call "echo \"      test: ['CMD', '/usr/bin/healthcheck']\" >> $file"
+#  call "echo \"      interval: 30s\" >> $file"
+#  call "echo \"      timeout: 10s\" >> $file"
+#  call "echo \"      retries: 5\" >> $file"
+  call "echo \"    volumes:\" >> $file"
+  call "echo \"      - nextcloud:/var/www/html\" >> $file"
+  call "echo \"\" >> $file"
+  call "echo \"  db:\" >> $file"
+  call "echo \"    image: mariadb\" >> $file"
+  call "echo \"    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW\" >> $file"
+  call "echo \"    restart: always\" >> $file"
+  call "echo \"    environment:\" >> $file"
+  call "echo \"      - MARIADB_MAX_ALLOWED_PACKET=128M\" >> $file"
+  call "echo \"      - MARIADB_INNODB_LOG_FILE_SIZE=64M\" >> $file"
+  call "echo \"      - MYSQL_ROOT_PASSWORD=nextcloud\" >> $file"
+  call "echo \"      - MYSQL_PASSWORD=nextcloud\" >> $file"
+  call "echo \"      - MYSQL_DATABASE=nextcloud\" >> $file"
+  call "echo \"      - MYSQL_USER=nextcloud\" >> $file"
+#  call "echo \"    healthcheck:\" >> $file"
+#  call "echo \"      test: ['CMD', '/usr/bin/healthcheck']\" >> $file"
+#  call "echo \"      interval: 30s\" >> $file"
+#  call "echo \"      timeout: 10s\" >> $file"
+#  call "echo \"      retries: 5\" >> $file"
+  call "echo \"    volumes:\" >> $file"
+  call "echo \"      - db:/var/lib/mysql\" >> $file"
+  call "echo \"      - backup:/var/lib/backup\" >> $file"
+  call "echo \"\" >> $file"
+  call "echo \"  redis:\" >> $file"
+  call "echo \"    image: redis\" >> $file"
+  call "echo \"    command: --requirepass redis\" >> $file"
+  call "echo \"    restart: always\" >> $file"
+  call "echo \"    environment:\" >> $file"
+  call "echo \"      - REDIS_DATABASES=1\" >> $file"
+#  call "echo \"    healthcheck:\" >> $file"
+#  call "echo \"      test: ['CMD', '/usr/bin/healthcheck']\" >> $file"
+#  call "echo \"      interval: 30s\" >> $file"
+#  call "echo \"      timeout: 10s\" >> $file"
+#  call "echo \"      retries: 5\" >> $file"
+  call "echo \"    volumes:\" >> $file"
+  call "echo \"      - redis:/var/lib/redis\" >> $file"
+}
+
+
+changeNextCloudAdminPassword()
+{
+  declare nextCloudPassword=$1
+  echo "Changing NextCloud admin password..."
+  call "docker-compose exec -u www-data nextcloud php occ maintenance:install || true"
+  calculatePasswordSha1 "$nextCloudPassword"
+  call "docker-compose exec nextcloud mysql -h db -pnextcloud -P 3306 -u nextcloud -D nextcloud -e \"update oc_users set password='$passwordSha1' where uid='admin';\""
+}
+
+
+declare passwordSha1
+calculatePasswordSha1()
+{
+  declare nextCloudPassword=$1
+  declare array
+  call "array=(\$( echo -n \"$nextCloudPassword\" | sha1sum ))"
+  passwordSha1=${array[0]}
+}
+
+
+installAdditionalNextCloudApps()
+{
+  echo "Installing additional NextCloud apps..."
   call "docker-compose exec -u www-data nextcloud php occ app:install announcementcenter || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install audioplayer || true"
 #  call "docker-compose exec -u www-data nextcloud php occ app:install brute_force_protection || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install calendar || true"
-# Enable after Pico CMS works out of the box, again, for Nextcloud 29
-#  call "docker-compose exec -u www-data nextcloud php occ app:install cms_pico || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install contacts || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install drawio || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install files_pdfviewer || true"
@@ -713,7 +850,12 @@ installNextCloud()
   call "docker-compose exec -u www-data nextcloud php occ app:install polls || true"
   call "docker-compose exec -u www-data nextcloud php occ app:install tasks || true"
 #  call "docker-compose exec -u www-data nextcloud php occ app:install wallpaper || true"
-  echo "Adding users..."
+}
+
+
+addingNextCloudUsers()
+{
+  echo "Adding NextCloud users..."
   declare count=$userCount
   while [ "$count" -gt 0 ]
   do
@@ -721,33 +863,34 @@ installNextCloud()
     call "docker-compose exec -u www-data -e OC_PASS=\"${userPassword[$count]}\" nextcloud php occ user:add --password-from-env --display-name=\"${userFullName[$count]}\" --group=\"users\" ${userName[$count]} || true"
     call "docker-compose exec -u www-data nextcloud php occ user:setting ${userName[$count]} settings email \"${userEMail[$count]}\" || true"
   done
-  echo "Restarting NextCloud..."
-  call "docker-compose restart nextcloud"
-  call "cd .."
 }
 
 
-installPicoCms()
+restartNextCloud()
 {
-  call "cd nextcloud"
-  call "docker-compose exec -u root nextcloud apt-get update"
-  call "docker-compose exec -u root nextcloud apt-get install git -y"
-  call "docker-compose exec -u www-data nextcloud rm -rf custom_apps/cms_pico"
-  call "docker-compose exec -u www-data nextcloud git clone https://github.com/nextcloud/cms_pico.git custom_apps/cms_pico"
-  call "docker-compose exec -u www-data nextcloud rm custom_apps/cms_pico/composer.lock"
-  call "docker-compose exec -u www-data nextcloud sed -i '/incompass\\/coverage/d' custom_apps/cms_pico/composer.json"
-  call "docker-compose exec -u www-data nextcloud sed -i -n '1h;2,\$H;\${g;s/,[ \\n]*\\}/\\n\\}/g;p}' custom_apps/cms_pico/composer.json"
-  call "docker-compose exec -u www-data nextcloud php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\""
-  call "docker-compose exec -u www-data nextcloud php -r \"if (hash_file('sha384', 'composer-setup.php') === 'c8b085408188070d5f52bcfe4ecfbee5f727afa458b2573b8eaaf77b3419b0bf2768dc67c86944da1544f06fa544fd47') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;\""
-  call "docker-compose exec -u www-data nextcloud php composer-setup.php"
-  call "docker-compose exec -u www-data nextcloud php -r \"unlink('composer-setup.php');\""
-  call "docker-compose exec -u www-data -w /var/www/html/custom_apps/cms_pico nextcloud php ../../composer.phar config policy.advisories.block false"
-  call "docker-compose exec -u www-data -w /var/www/html/custom_apps/cms_pico nextcloud php ../../composer.phar install"
-  call "cd .."
-  # Fix Pico CMS (Enable after Pico CMS works out of the box, again, for Nextcloud 29)
-  sed -i -n "1h;2,\$H;\${g;s/\$icon[ \\t\\n]*.tooltip('destroy')[ \\t\\n]*.attr('title', compatReason)[ \\t\\n]*.tooltip();//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/custom_apps/cms_pico/js/admin.js
-  sed -i -n "1h;2,\$H;\${g;s/\$baseElement.find('.has-tooltip').tooltip('hide');//g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/custom_apps/cms_pico/js/pico.js
-  sed -i -n "1h;2,\$H;\${g;s/return \$this->getHtmlPurifier()->purify(\$content);/return \$content;/g;p}" /var/lib/docker/volumes/nextcloud_nextcloud/_data/custom_apps/cms_pico/lib/Pico.php
+  echo "Restarting NextCloud..."
+  call "docker-compose restart nextcloud"
+}
+
+
+startHugoTimers()
+{
+  call "systemctl daemon-reload"
+  declare count=$certificateCount
+  while [ "$count" -gt 1 ]
+  do
+    let count=count-1
+    startHugoTimer $count
+  done
+}
+
+
+startHugoTimer()
+{
+  declare siteNo=$1
+  declare serverName=${certificateDomain[$siteNo]}
+  echo "Web site $siteNo: $serverName"
+  call "systemctl enable --now '$serverName-hugo.timer'"
 }
 
 
@@ -802,7 +945,9 @@ saveSettings()
     call "echo \"certificateState[$count]='${certificateState[$count]}'\" >> $newFile"
     call "echo \"certificateCity[$count]='${certificateCity[$count]}'\" >> $newFile"
     call "echo \"certificateOrganization[$count]='${certificateOrganization[$count]}'\" >> $newFile"
+    call "echo \"certificateUser[$count]='${certificateUser[$count]}'\" >> $newFile"
     call "echo \"certificateEMail[$count]='${certificateEMail[$count]}'\" >> $newFile"
+    call "echo \"certificatePublic[$count]='${certificatePublic[$count]}'\" >> $newFile"
   done
   call "echo \"sshdPort=$sshdPort\" >> $newFile"
   if [ -e "$file" ]
@@ -836,6 +981,7 @@ runStep "Changing root password..." changeRootPassword
 runStep "Adding main user..." addUser 0
 runStep "Adding additional users..." addAdditionalUser
 runStep "Installing tools..." installTools
+runStep "Installing Hugo..." installHugo
 runStep "Adding Let's Encrypt repository..." addLetsEncryptRepository
 runStep "Adding Docker repository..." addDockerRepository
 runStep "Updating package database..." call "apt-get update"
@@ -843,9 +989,8 @@ runStep "Installing Let's Encrypt..." installLetsEncrypt
 runStep "Installing Docker..." installDocker
 runStep "Configuring host's apache web server..." configureApache
 runStep "Installing Docker container NextCloud..." installNextCloud
-# Disable after Pico CMS works out of the box, again, for Nextcloud 29
-runStep "Installing Pico CMS..." installPicoCms
 runStep "Restarting host's apache web server..." call "service apache2 restart"
+runStep "Starting Hugo timers..." startHugoTimers
 runStep "Disabling SSH root login..." disableSshRootLogin
 runStep "Changing SSH port..." changeSshPort
 runStep "Restarting SSH daemon..." call "systemctl restart ssh.service"
