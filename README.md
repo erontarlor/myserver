@@ -1,11 +1,11 @@
 # myserver
-Linux BASH script for setting up a private web server with pre-configured NextCloud service and automatically renewing Let's Encrypt SSL certificates, based on a basic Ubuntu 20.04 cloud server with root access, using docker images.
+Linux BASH script for setting up a private web server with pre-configured NextCloud service and automatically renewing Let's Encrypt SSL certificates, based on a basic Ubuntu 26.04 cloud server with root access, using docker images.
 
-(c) 2024 by erontarlor
+(c) 2026 by erontarlor
 
 ## Prerequisites
-- Cloud server with root permissions (tested with 1&1 Cloud, but likely will work with other providers)
-- Minimal Ubuntu OS installed (tested with Ubuntu 20.04, but likely will work with other Ubuntu based distributions and versions)
+- Cloud server with root permissions (tested with IONOS Cloud, but likely will work with other providers)
+- Minimal Ubuntu OS installed (tested with Ubuntu 26.04, but likely will work with other Ubuntu based distributions and versions)
 - SSH access to the cloud server
 
 ## Installation
